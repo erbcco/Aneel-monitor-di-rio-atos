@@ -45,7 +45,6 @@ jobs:
             git commit -m "📊 Resultados ANEEL $(date +'%Y-%m-%d %H:%M') [skip ci]"
           git push || echo "Nada para commitar"
         fi
-        
     - name: 📤 Upload resultados como artifact
       uses: actions/upload-artifact@v3
       with:

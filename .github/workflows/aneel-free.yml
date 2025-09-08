@@ -45,14 +45,14 @@ jobs:
             git commit -m "📊 Resultados ANEEL $(date +'%Y-%m-%d %H:%M') [skip ci]"
           git push || echo "Nada para commitar"
         fi
+        
     - name: 📤 Upload resultados como artifact
       uses: actions/upload-artifact@v3
       with:
         name: aneel-results-${{ github.run_number }}
         path: resultados_aneel.json
         retention-days: 30
-      if: always()
-      - name: 📊 Mostrar estatísticas
+      if: always()- name: Mostrar estatísticas
   run: |
     if [ -f "resultados_aneel.json" ]; then
       echo "📋 Resumo da Execução:"

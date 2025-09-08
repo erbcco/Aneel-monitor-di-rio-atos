@@ -54,7 +54,7 @@ jobs:
         retention-days: 30
       if: always()
       
-  - name: 📊 Mostrar estatísticas
+- name: 📊 Mostrar estatísticas
   run: |
     if [ -f "resultados_aneel.json" ]; then
       echo "📋 Resumo da Execução:"

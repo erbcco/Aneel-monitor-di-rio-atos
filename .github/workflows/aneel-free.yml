@@ -60,18 +60,18 @@ jobs:
             echo "📋 Resumo da Execução:"
             (
             cat <<EOF > mostrar_stats.py
-  import json
-  with open('resultados_aneel.json', 'r', encoding='utf-8') as f:
-      data = json.load(f)
-      stats = data['estatisticas']
-      print(f'✅ Execução concluída em: {stats[\"data_execucao\"]}')
-      print(f'🔍 Termos buscados: {stats[\"total_termos_buscados\"]}')
-      print(f'📄 Documentos encontrados: {stats[\"total_documentos_encontrados\"]}')
-      print(f'🎯 Documentos relevantes: {stats[\"documentos_relevantes\"]}')
-      print('📊 Por categoria:')
-      for cat, num in stats['documentos_por_categoria'].items():
-          print(f'  • {cat}: {num}')
-  EOF
-            )
-            python mostrar_stats.py
+import json
+with open('resultados_aneel.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+    stats = data['estatisticas']
+    print(f'✅ Execução concluída em: {stats[\"data_execucao\"]}')
+    print(f'🔍 Termos buscados: {stats[\"total_termos_buscados\"]}')
+    print(f'📄 Documentos encontrados: {stats[\"total_documentos_encontrados\"]}')
+    print(f'🎯 Documentos relevantes: {stats[\"documentos_relevantes\"]}')
+    print('📊 Por categoria:')
+    for cat, num in stats['documentos_por_categoria'].items():
+        print(f'  • {cat}: {num}')
+ EOF
+          )
+          python mostrar_stats.py
           fi

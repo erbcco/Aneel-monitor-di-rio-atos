@@ -58,7 +58,7 @@ jobs:
         run: |
           if [ -f "resultados_aneel.json" ]; then
             echo "📋 Resumo da Execução:"
-            python -c "
+            cat << EOF > mostrar_stats.py
 import json
 with open('resultados_aneel.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
@@ -70,5 +70,6 @@ with open('resultados_aneel.json', 'r', encoding='utf-8') as f:
     print('📊 Por categoria:')
     for cat, num in stats['documentos_por_categoria'].items():
         print(f'  • {cat}: {num}')
-"
+EOF
+            python mostrar_stats.py
           fi

@@ -74,4 +74,4 @@ with open('resultados_aneel.json', 'r', encoding='utf-8') as f:
  EOF
           )
           python mostrar_stats.py
-          fi
+        fi

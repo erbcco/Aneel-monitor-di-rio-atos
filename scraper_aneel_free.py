@@ -24,7 +24,7 @@ class AneelScraperFree:
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecém I", "P. Pecém", "Pecém", "Pecem",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria",
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia"           
         ]
@@ -34,7 +34,7 @@ class AneelScraperFree:
             "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"],
             "Porto_Pecem": ["Porto do Pecém I", "P. Pecém", "Pecém", "Pecem"],
             "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC"],
-            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria"],
+            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME"],
             "Comercializacao": ["exportação de energia"]
         }
         self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
@@ -205,11 +205,11 @@ class AneelScraperFree:
             'todos_documentos': doc_unicos
         }
         self.salvar_resultados(resultado)
-        if docs_relevantes:
-            self.enviar_email_gratuito(resultado)
-            logger.info(f"E-mail enviado com {len(docs_relevantes)} documentos relevantes")
-        else:
-            logger.info("Nenhum documento relevante encontrado para envio de e-mail")
+
+        # Sempre enviar email, detalhando situação
+        self.enviar_email_gratuito(resultado)
+        logger.info(f"E-mail enviado com {len(docs_relevantes)} documentos relevantes")
+        
         return resultado
     
     def salvar_resultados(self, resultado):
@@ -264,6 +264,8 @@ Data: {datetime.now().strftime('%d/%m/%Y às %H:%M')}
                     if doc['url']:
                         corpo += f"   URL: {doc['url']}\n"
                     corpo += "\n"
+            else:
+                corpo += "\n⚠️ Nenhum ato publicado ou correspondente aos termos pesquisados para o dia.\n"
             
             corpo += """
 ⚡ Sistema automático de monitoramento

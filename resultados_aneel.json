@@ -1,6 +1,6 @@
 {
   "estatisticas": {
-    "total_termos_buscados": 24,
+    "total_termos_buscados": 22,
     "total_documentos_encontrados": 0,
     "documentos_por_categoria": {
       "Diamante_Energia": 0,
@@ -10,7 +10,7 @@
       "Comercializacao": 0
     },
     "documentos_relevantes": 0,
-    "data_execucao": "2025-09-23T20:34:54.954381"
+    "data_execucao": "2025-09-23T20:48:15.310942"
   },
   "documentos_relevantes": [],
   "todos_documentos": []

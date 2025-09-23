@@ -24,7 +24,7 @@ class AneelScraperFree:
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
             "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME", "Termelétrica",
-            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL","UTLA", "UTLB", "UTLC",
+            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC",
             "exportação de energia"
         ]
         
@@ -36,7 +36,7 @@ class AneelScraperFree:
             "Comercializacao": ["exportação de energia"]
         }
         self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
-        
+    
     def buscar_por_termo(self, termo):
         params = {
             'aba': 'Legislacao',
@@ -53,14 +53,36 @@ class AneelScraperFree:
         try:
             logger.info(f"Buscando: {termo} na data {self.data_pesquisa}")
             response = requests.get(self.base_url, params=params, headers=self.headers, timeout=30)
-            
-            # Aqui imprime a URL completa no log
-            logger.info(f"URL requisitada: {response.url}")
-
             response.raise_for_status()
+            logger.info(f"URL requisitada: {response.url}")
+            
             soup = BeautifulSoup(response.content, 'html.parser')
-            documentos = self.extrair_documentos(soup, termo)
-            time.sleep(2)
+            
+            # Extrair link da página com guid de resultados
+            link_resultados = soup.find('a', href=True, text=lambda t: t and 'Resultado' in t)
+            
+            if not link_resultados:
+                # Se não encontrou link com texto, tentar extrair URL com "guid" no href manualmente
+                link_resultados = None
+                for a in soup.find_all('a', href=True):
+                    if 'Resultado/ListarLegislacao?guid=' in a['href']:
+                        link_resultados = a
+                        break
+            
+            if not link_resultados:
+                logger.warning("Não foi possível localizar a URL de resultados com GUID.")
+                return []
+            
+            url_resultados = "https://biblioteca.aneel.gov.br" + link_resultados['href']
+            logger.info(f"URL da página de resultados detectada: {url_resultados}")
+            
+            # Requisição para página de resultados com GUID
+            response_result = requests.get(url_resultados, headers=self.headers, timeout=30)
+            response_result.raise_for_status()
+            soup_result = BeautifulSoup(response_result.content, 'html.parser')
+            
+            documentos = self.extrair_documentos(soup_result, termo)
+            time.sleep(2)  # atraso para não sobrecarregar
             
             return documentos
         except Exception as e:
@@ -70,10 +92,11 @@ class AneelScraperFree:
     def extrair_documentos(self, soup, termo_busca):
         documentos = []
         
-        # Seletores atuais para resultados (ajuste conforme estrutura do site)
-        resultados = soup.select('div.panel-body .row .col-lg-10 a')
+        # Seletor para links dos atos na página de resultados
+        resultados = soup.select('div.col-md-10 > a')  # Ajustar se necessário conforme estrutura real
+        
         if not resultados:
-            logger.warning("Nenhum resultado encontrado com o seletor padrão.")
+            logger.warning("Nenhum resultado encontrado na página de resultados.")
         
         for resultado in resultados[:10]:
             try:
@@ -94,7 +117,7 @@ class AneelScraperFree:
             except Exception as e:
                 logger.warning(f"Erro ao processar documento: {e}")
                 continue
-                
+        
         logger.info(f"{len(documentos)} documentos encontrados para termo '{termo_busca}'")
         return documentos
     
@@ -157,8 +180,7 @@ class AneelScraperFree:
             doc = self.buscar_por_termo(termo)
             todos_documentos.extend(doc)
             categoria = self.identificar_categoria(termo)
-            estatisticas['documentos_por_categoria'][categoria] = \
-                estatisticas['documentos_por_categoria'].get(categoria, 0) + len(doc)
+            estatisticas['documentos_por_categoria'][categoria] = estatisticas['documentos_por_categoria'].get(categoria, 0) + len(doc)
         
         doc_unicos, titulos_vistos = [], set()
         for d in todos_documentos:
@@ -167,7 +189,7 @@ class AneelScraperFree:
                 doc_unicos.append(d)
                 titulos_vistos.add(titulo)
         
-        docs_relevantes = [d for d in doc_unicos if d['relevancia'] in ('alta','média')]
+        docs_relevantes = [d for d in doc_unicos if d['relevancia'] in ('alta', 'média')]
         estatisticas['total_documentos_encontrados'] = len(doc_unicos)
         estatisticas['documentos_relevantes'] = len(docs_relevantes)
         
@@ -178,7 +200,7 @@ class AneelScraperFree:
         }
         self.salvar_resultados(resultado)
 
-        # Sempre enviar email mesmo sem documentos relevantes
+        # Sempre enviar e-mail
         self.enviar_email_gratuito(resultado)
         logger.info(f"E-mail enviado com {len(docs_relevantes)} documentos relevantes")
         

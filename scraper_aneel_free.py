@@ -23,17 +23,17 @@ class AneelScraperFree:
         # Palavras-chave específicas para pesquisa
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
-            "Porto do Pecém I", "P. Pecém", "Pecém", "Pecem",
+            "Porto do Pecém I", "P. Pecém", "Pecém", "Pecem", "Pecem Energia", "Energia Pecem",
             "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
-            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
+            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "Usina Termelétrica",
             "UTLA", "UTLB", "UTLC", "exportação de energia"           
         ]
         
         # Categorização para análise
         self.categorias = {
             "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"],
-            "Porto_Pecem": ["Porto do Pecém I", "P. Pecém", "Pecém", "Pecem"],
-            "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC"],
+            "Porto_Pecem": ["Porto do Pecém I", "P. Pecém", "Pecém", "Pecem", "Pecem Energia", "Energia Pecem"],
+            "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC", "Usina Termelétrica"],
             "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME"],
             "Comercializacao": ["exportação de energia"]
         }

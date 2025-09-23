@@ -20,44 +20,45 @@ class AneelScraperFree:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
-        # Palavras-chave específicas para pesquisa
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
-            "Porto do Pecém I", "P. Pecém", "Pecém", "Pecem", "Pecem Energia", "Energia Pecem",
+            "Porto do Pecem", "P. Pecem", "Pecém", "Pecem", "Pecem Energia", "Energia Pecem",
             "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
-            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "Usina Termelétrica",
-            "UTLA", "UTLB", "UTLC", "exportação de energia"           
+            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "Termelétrica",
+            "UTLA", "UTLB", "UTLC", "exportação de energia"
         ]
         
-        # Categorização para análise
         self.categorias = {
             "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"],
-            "Porto_Pecem": ["Porto do Pecém I", "P. Pecém", "Pecém", "Pecem", "Pecem Energia", "Energia Pecem"],
-            "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC", "Usina Termelétrica"],
+            "Porto_Pecem": ["Porto do Pecem", "P. Pecem", "Pecém", "Pecem", "Pecem Energia", "Energia Pecem"],
+            "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC", "Termelétrica"],
             "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME"],
             "Comercializacao": ["exportação de energia"]
         }
         self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
-    
+        
     def buscar_por_termo(self, termo):
-        """Buscar documentos que contenham termo na aba legislação filtrando por data de publicação"""
         params = {
-            'campo1': 'Todos os campos',
-            'termo1': termo,
-            'conectivo1': 'E',
-            'campo2': 'Publicação',
-            'operador2': 'Entre',
-            'data_inicial': self.data_pesquisa,
-            'data_final': self.data_pesquisa
+            'aba': 'Legislacao',
+            'tipoPesquisa': 'avancada',
+            'campoTexto1': 'Todos os campos',
+            'operadorTexto1': 'E',
+            'termoTexto1': termo,
+            'campoData': 'Publicacao',
+            'dataInicio': self.data_pesquisa,
+            'dataFim': self.data_pesquisa,
+            'paginaAtual': '1',
+            'numeroRegistros': '10'
         }
         try:
             logger.info(f"Buscando: {termo} na data {self.data_pesquisa}")
             response = requests.get(self.base_url, params=params, headers=self.headers, timeout=30)
             response.raise_for_status()
+            logger.debug(f"URL requisitada: {response.url}")
             
             soup = BeautifulSoup(response.content, 'html.parser')
             documentos = self.extrair_documentos(soup, termo)
-            time.sleep(2)  # delay para evitar sobrecarga
+            time.sleep(2)
             
             return documentos
         except Exception as e:
@@ -65,48 +66,18 @@ class AneelScraperFree:
             return []
     
     def extrair_documentos(self, soup, termo_busca):
-        """Extrai documentos relevantes da pesquisa"""
         documentos = []
-        possiveis_seletores = [
-            '.resultado-item', '.resultado', '.item-resultado',
-            '.document-item', 'div[class*="result"]', 'tr[class*="result"]'
-        ]
         
-        resultados = []
-        for seletor in possiveis_seletores:
-            elementos = soup.select(seletor)
-            if elementos:
-                resultados = elementos
-                break
-        
-        # Se não encontrou resultados via seletores, busca baseada em links comuns
+        # Seletores atuais para resultados (ajuste conforme estrutura do site)
+        resultados = soup.select('div.panel-body .row .col-lg-10 a')
         if not resultados:
-            links = soup.find_all('a', href=True)
-            for link in links:
-                href = link.get('href', '')
-                texto = link.get_text(strip=True)
-                
-                if any(palavra in href.lower() for palavra in ['documento', 'resolucao', 'despacho']) or \
-                   any(palavra in texto.lower() for palavra in ['resolução', 'despacho', 'consulta']):
-                    
-                    documento = {
-                        'titulo': texto[:200] if texto else 'Documento encontrado',
-                        'url': self.construir_url_completa(href),
-                        'tipo': self.identificar_tipo(texto),
-                        'termo_busca': termo_busca,
-                        'data_encontrado': datetime.now().strftime('%Y-%m-%d'),
-                        'relevancia': self.calcular_relevancia(texto, termo_busca)
-                    }
-                    documentos.append(documento)
+            logger.warning("Nenhum resultado encontrado com o seletor padrão.")
         
-        # Processar resultados via seletores no máximo 10 por termo
         for resultado in resultados[:10]:
             try:
-                titulo_elem = resultado.find(['h1', 'h2', 'h3', 'h4', 'a']) or resultado
-                titulo = titulo_elem.get_text(strip=True) if titulo_elem else "Título não encontrado"
-                
-                link_elem = resultado.find('a', href=True)
-                url = self.construir_url_completa(link_elem.get('href')) if link_elem else ""
+                titulo = resultado.get_text(strip=True)
+                href = resultado.get('href')
+                url = self.construir_url_completa(href)
                 
                 documento = {
                     'titulo': titulo[:200],
@@ -119,14 +90,13 @@ class AneelScraperFree:
                 }
                 documentos.append(documento)
             except Exception as e:
-                logger.warning(f"Erro ao processar resultado: {e}")
+                logger.warning(f"Erro ao processar documento: {e}")
                 continue
-        
+                
         logger.info(f"{len(documentos)} documentos encontrados para termo '{termo_busca}'")
         return documentos
     
     def construir_url_completa(self, href):
-        """Converte href relativo para url absoluta"""
         if not href:
             return ""
         if href.startswith('http'):
@@ -206,7 +176,7 @@ class AneelScraperFree:
         }
         self.salvar_resultados(resultado)
 
-        # Sempre enviar email, detalhando situação
+        # Sempre enviar email mesmo sem documentos relevantes
         self.enviar_email_gratuito(resultado)
         logger.info(f"E-mail enviado com {len(docs_relevantes)} documentos relevantes")
         
@@ -261,9 +231,7 @@ Data: {datetime.now().strftime('%d/%m/%Y às %H:%M')}
                     corpo += f"   Tipo: {doc['tipo']}\n"
                     corpo += f"   Categoria: {doc['categoria']}\n"
                     corpo += f"   Relevância: {doc['relevancia']}\n"
-                    if doc['url']:
-                        corpo += f"   URL: {doc['url']}\n"
-                    corpo += "\n"
+                    corpo += f"   URL: {doc['url']}\n\n"
             else:
                 corpo += "\n⚠️ Nenhum ato publicado ou correspondente aos termos pesquisados para o dia.\n"
             

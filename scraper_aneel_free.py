@@ -53,8 +53,9 @@ class AneelScraperFree:
         try:
             logger.info(f"Buscando: {termo} na data {self.data_pesquisa}")
             response = requests.get(self.base_url, params=params, headers=self.headers, timeout=30)
-            response.raise_for_status()
-            logger.debug(f"URL requisitada: {response.url}")
+            logger.info(f"Status da resposta: {response.status_code}")
+            logger.info(f"Status da resposta: {response.status_code}")
+            logger.info(f"Conteúdo (início): {response.text[:1000]}")
             
             soup = BeautifulSoup(response.content, 'html.parser')
             documentos = self.extrair_documentos(soup, termo)

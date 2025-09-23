@@ -22,12 +22,19 @@ class AneelScraperFree:
         
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
-            "Porto do Pecem", "P. Pecem", "Pecém", "Pecem", "Pecem Energia", "Energia Pecem",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
-            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "Termelétrica",
-            "UTLA", "UTLB", "UTLC", "exportação de energia"
+            "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME", "Termelétrica",
+            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL","UTLA", "UTLB", "UTLC",
+            "exportação de energia"
         ]
         
+        self.categorias = {
+            "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"],
+            "Porto_Pecem": ["Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia"],
+            "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC"],
+            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME", "Termelétrica"],
+            "Comercializacao": ["exportação de energia"]
+        }
         self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
         
     def buscar_por_termo(self, termo):

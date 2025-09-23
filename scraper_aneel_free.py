@@ -20,11 +20,11 @@ class AneelScraperFree:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
-        # Palavras-chave específicas fornecidas
+        # Palavras-chave específicas para pesquisa
         self.palavras_chave = [
-            "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"
+            "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecém I", "P. Pecém", "Pecém", "Pecem",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria"
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia"           
         ]
@@ -37,63 +37,57 @@ class AneelScraperFree:
             "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria"],
             "Comercializacao": ["exportação de energia"]
         }
+        self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
     
     def buscar_por_termo(self, termo):
-        """Busca individual por termo específico"""
+        """Buscar documentos que contenham termo na aba legislação filtrando por data de publicação"""
         params = {
             'campo1': 'Todos os campos',
             'termo1': termo,
-            'conectivo1': 'E'
+            'conectivo1': 'E',
+            'campo2': 'Publicação',
+            'operador2': 'Entre',
+            'data_inicial': self.data_pesquisa,
+            'data_final': self.data_pesquisa
         }
-        
         try:
-            logger.info(f"Buscando: {termo}")
+            logger.info(f"Buscando: {termo} na data {self.data_pesquisa}")
             response = requests.get(self.base_url, params=params, headers=self.headers, timeout=30)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.content, 'html.parser')
             documentos = self.extrair_documentos(soup, termo)
-            
-            # Delay para não sobrecarregar o servidor
-            time.sleep(2)
+            time.sleep(2)  # delay para evitar sobrecarga
             
             return documentos
-            
         except Exception as e:
             logger.error(f"Erro ao buscar '{termo}': {e}")
             return []
     
     def extrair_documentos(self, soup, termo_busca):
-        """Extrai documentos da página de resultados"""
+        """Extrai documentos relevantes da pesquisa"""
         documentos = []
-        
-        # Tentar diferentes seletores para encontrar resultados
-        possíveis_seletores = [
-            '.resultado-item',
-            '.resultado',
-            '.item-resultado',
-            '.document-item',
-            'div[class*="result"]',
-            'tr[class*="result"]'
+        possiveis_seletores = [
+            '.resultado-item', '.resultado', '.item-resultado',
+            '.document-item', 'div[class*="result"]', 'tr[class*="result"]'
         ]
         
         resultados = []
-        for seletor in possíveis_seletores:
+        for seletor in possiveis_seletores:
             elementos = soup.select(seletor)
             if elementos:
                 resultados = elementos
                 break
         
-        # Se não encontrou seletores específicos, buscar por padrões
+        # Se não encontrou resultados via seletores, busca baseada em links comuns
         if not resultados:
-            # Buscar por links que contenham padrões típicos da ANEEL
             links = soup.find_all('a', href=True)
             for link in links:
                 href = link.get('href', '')
-                texto = link.get_text().strip()
+                texto = link.get_text(strip=True)
                 
-                if any(pattern in href.lower() for pattern in ['documento', 'resolucao', 'despacho']) or \
-                   any(pattern in texto.lower() for pattern in ['resolução', 'despacho', 'consulta']):
+                if any(palavra in href.lower() for palavra in ['documento', 'resolucao', 'despacho']) or \
+                   any(palavra in texto.lower() for palavra in ['resolução', 'despacho', 'consulta']):
                     
                     documento = {
                         'titulo': texto[:200] if texto else 'Documento encontrado',
@@ -105,14 +99,12 @@ class AneelScraperFree:
                     }
                     documentos.append(documento)
         
-        # Processar resultados encontrados com seletores
-        for resultado in resultados[:10]:  # Limitar a 10 por busca
+        # Processar resultados via seletores no máximo 10 por termo
+        for resultado in resultados[:10]:
             try:
-                # Tentar extrair título
                 titulo_elem = resultado.find(['h1', 'h2', 'h3', 'h4', 'a']) or resultado
-                titulo = titulo_elem.get_text().strip() if titulo_elem else "Título não encontrado"
+                titulo = titulo_elem.get_text(strip=True) if titulo_elem else "Título não encontrado"
                 
-                # Tentar extrair URL
                 link_elem = resultado.find('a', href=True)
                 url = self.construir_url_completa(link_elem.get('href')) if link_elem else ""
                 
@@ -125,81 +117,63 @@ class AneelScraperFree:
                     'relevancia': self.calcular_relevancia(titulo, termo_busca),
                     'categoria': self.identificar_categoria(termo_busca)
                 }
-                
                 documentos.append(documento)
-                
             except Exception as e:
-                logger.warning(f"Erro ao processar resultado individual: {e}")
+                logger.warning(f"Erro ao processar resultado: {e}")
                 continue
         
-        logger.info(f"Encontrados {len(documentos)} documentos para '{termo_busca}'")
+        logger.info(f"{len(documentos)} documentos encontrados para termo '{termo_busca}'")
         return documentos
     
     def construir_url_completa(self, href):
-        """Constrói URL completa a partir de href relativo"""
+        """Converte href relativo para url absoluta"""
         if not href:
             return ""
-        
         if href.startswith('http'):
             return href
-        elif href.startswith('/'):
+        if href.startswith('/'):
             return f"https://biblioteca.aneel.gov.br{href}"
-        else:
-            return f"https://biblioteca.aneel.gov.br/{href}"
+        return f"https://biblioteca.aneel.gov.br/{href}"
     
     def identificar_tipo(self, titulo):
-        """Identifica tipo do documento pelo título"""
         titulo_lower = titulo.lower()
-        
         tipos = {
             'resolução': 'Resolução Normativa',
             'despacho': 'Despacho Regulatório',
             'consulta pública': 'Consulta Pública',
             'audiência': 'Audiência Pública',
             'tomada de subsídio': 'Tomada de Subsídio',
-            'cvv': 'CVU - Custo Variável Unitário',
+            'cvu': 'CVU - Custo Variável Unitário',
             'cer': 'CER - Contrato de Energia de Reserva',
             'relatório': 'Relatório',
             'ata': 'Ata de Reunião'
         }
-        
-        for palavra, tipo in tipos.items():
-            if palavra in titulo_lower:
-                return tipo
-        
+        for chave, valor in tipos.items():
+            if chave in titulo_lower:
+                return valor
         return 'Documento Regulatório'
     
     def calcular_relevancia(self, titulo, termo_busca):
-        """Calcula relevância baseada em critérios específicos"""
         titulo_lower = titulo.lower()
         termo_lower = termo_busca.lower()
-        
-        # Alta relevância
-        if any(palavra in titulo_lower for palavra in [
+        if any(pal in titulo_lower for pal in [
             'resolução normativa', 'despacho', 'consulta pública',
             'audiência pública', 'tomada de subsídio'
         ]):
             return 'alta'
-        
-        # Média relevância
         if termo_lower in titulo_lower:
             return 'média'
-        
         return 'baixa'
     
     def identificar_categoria(self, termo_busca):
-        """Identifica categoria do termo buscado"""
         for categoria, termos in self.categorias.items():
             if termo_busca in termos:
                 return categoria
         return 'Outros'
     
     def executar_consulta_completa(self):
-        """Executa busca para todos os termos"""
         logger.info("Iniciando consulta completa ANEEL...")
-        
-        todos_documentos = []
-        estatisticas = {
+        todos_documentos, estatisticas = [], {
             'total_termos_buscados': len(self.palavras_chave),
             'total_documentos_encontrados': 0,
             'documentos_por_categoria': {},
@@ -207,83 +181,62 @@ class AneelScraperFree:
             'data_execucao': datetime.now().isoformat()
         }
         
-        # Buscar por cada termo individualmente
         for termo in self.palavras_chave:
-            documentos = self.buscar_por_termo(termo)
-            todos_documentos.extend(documentos)
-            
-            # Atualizar estatísticas
+            doc = self.buscar_por_termo(termo)
+            todos_documentos.extend(doc)
             categoria = self.identificar_categoria(termo)
-            if categoria not in estatisticas['documentos_por_categoria']:
-                estatisticas['documentos_por_categoria'][categoria] = 0
-            estatisticas['documentos_por_categoria'][categoria] += len(documentos)
+            estatisticas['documentos_por_categoria'][categoria] = \
+                estatisticas['documentos_por_categoria'].get(categoria, 0) + len(doc)
         
-        # Remover duplicatas baseado em título
-        documentos_unicos = []
-        titulos_vistos = set()
+        doc_unicos, titulos_vistos = [], set()
+        for d in todos_documentos:
+            titulo = d['titulo'].lower().strip()
+            if titulo not in titulos_vistos and len(titulo) > 10:
+                doc_unicos.append(d)
+                titulos_vistos.add(titulo)
         
-        for doc in todos_documentos:
-            titulo_normalizado = doc['titulo'].lower().strip()
-            if titulo_normalizado not in titulos_vistos and len(titulo_normalizado) > 10:
-                documentos_unicos.append(doc)
-                titulos_vistos.add(titulo_normalizado)
+        docs_relevantes = [d for d in doc_unicos if d['relevancia'] in ('alta','média')]
+        estatisticas['total_documentos_encontrados'] = len(doc_unicos)
+        estatisticas['documentos_relevantes'] = len(docs_relevantes)
         
-        # Filtrar apenas relevantes
-        documentos_relevantes = [d for d in documentos_unicos if d['relevancia'] in ['alta', 'média']]
-        
-        # Atualizar estatísticas finais
-        estatisticas['total_documentos_encontrados'] = len(documentos_unicos)
-        estatisticas['documentos_relevantes'] = len(documentos_relevantes)
-        
-        # Preparar resultado final
         resultado = {
             'estatisticas': estatisticas,
-            'documentos_relevantes': documentos_relevantes[:20],  # Máximo 20 mais relevantes
-            'todos_documentos': documentos_unicos
+            'documentos_relevantes': docs_relevantes[:20],
+            'todos_documentos': doc_unicos
         }
-        
-        # Salvar resultado
         self.salvar_resultados(resultado)
-        
-        # Enviar email se houver documentos relevantes
-        if documentos_relevantes:
+        if docs_relevantes:
             self.enviar_email_gratuito(resultado)
-            logger.info(f"Email enviado! Encontrados {len(documentos_relevantes)} documentos relevantes")
+            logger.info(f"E-mail enviado com {len(docs_relevantes)} documentos relevantes")
         else:
-            logger.info("Nenhum documento relevante encontrado")
-        
+            logger.info("Nenhum documento relevante encontrado para envio de e-mail")
         return resultado
     
     def salvar_resultados(self, resultado):
-        """Salva resultados em arquivo JSON"""
         try:
             with open('resultados_aneel.json', 'w', encoding='utf-8') as f:
                 json.dump(resultado, f, ensure_ascii=False, indent=2)
-            logger.info("Resultados salvos em resultados_aneel.json")
+            logger.info("Arquivo resultados_aneel.json salvo com sucesso.")
         except Exception as e:
-            logger.error(f"Erro ao salvar arquivo: {e}")
+            logger.error(f"Erro ao salvar resultados: {e}")
     
     def enviar_email_gratuito(self, resultado):
-        """Envia email usando Gmail SMTP gratuito"""
-        # Configurações do email (via variáveis de ambiente)
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
-        email_user = os.getenv('GMAIL_USER')  # seu.email@gmail.com
-        email_pass = os.getenv('GMAIL_APP_PASSWORD')  # senha de app do Gmail
-        email_to = os.getenv('EMAIL_DESTINATARIO')  # destinatario@email.com
+        email_user = os.getenv('GMAIL_USER')
+        email_pass = os.getenv('GMAIL_APP_PASSWORD')
+        email_to = os.getenv('EMAIL_DESTINATARIO')
         
         if not all([email_user, email_pass, email_to]):
-            logger.warning("Configurações de email não definidas nas variáveis de ambiente")
+            logger.warning("Variáveis de ambiente de email não configuradas corretamente.")
             return False
         
         try:
-            # Criar mensagem
             msg = MIMEMultipart()
             msg['From'] = email_user
             msg['To'] = email_to
             msg['Subject'] = f"[ANEEL] Monitoramento Diário - {datetime.now().strftime('%d/%m/%Y')}"
             
-            # Preparar corpo do email
             stats = resultado['estatisticas']
             docs_relevantes = resultado['documentos_relevantes']
             
@@ -298,14 +251,12 @@ Data: {datetime.now().strftime('%d/%m/%Y às %H:%M')}
 
 📋 DOCUMENTOS POR CATEGORIA:
 """
-            
-            for categoria, quantidade in stats['documentos_por_categoria'].items():
-                corpo += f"• {categoria.replace('_', ' ')}: {quantidade}\n"
+            for cat, qtd in stats['documentos_por_categoria'].items():
+                corpo += f"• {cat.replace('_', ' ')}: {qtd}\n"
             
             if docs_relevantes:
                 corpo += f"\n🎯 DOCUMENTOS MAIS RELEVANTES ({len(docs_relevantes)}):\n\n"
-                
-                for i, doc in enumerate(docs_relevantes[:10], 1):  # Top 10
+                for i, doc in enumerate(docs_relevantes[:10], 1):
                     corpo += f"{i}. {doc['titulo']}\n"
                     corpo += f"   Tipo: {doc['tipo']}\n"
                     corpo += f"   Categoria: {doc['categoria']}\n"
@@ -315,37 +266,32 @@ Data: {datetime.now().strftime('%d/%m/%Y às %H:%M')}
                     corpo += "\n"
             
             corpo += """
-⚡ Sistema de monitoramento automático
-🆓 Executado gratuitamente via GitHub Actions
-📧 Email enviado via Gmail SMTP gratuito
+⚡ Sistema automático de monitoramento
+🆓 Executado via GitHub Actions
+📧 Envio via Gmail SMTP gratuito
 """
             
             msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
             
-            # Enviar email
             server = smtplib.SMTP(smtp_server, smtp_port)
             server.starttls()
             server.login(email_user, email_pass)
             server.send_message(msg)
             server.quit()
             
-            logger.info("✅ Email enviado com sucesso!")
+            logger.info("E-mail enviado com sucesso!")
             return True
-            
         except Exception as e:
-            logger.error(f"❌ Erro ao enviar email: {e}")
+            logger.error(f"Erro no envio do e-mail: {e}")
             return False
 
 def main():
-    """Função principal"""
-    print("🚀 Iniciando ANEEL Scraper Gratuito...")
-    
+    logger.info("Iniciando o monitoramento gratuito ANEEL...")
     scraper = AneelScraperFree()
     resultado = scraper.executar_consulta_completa()
     
-    print(f"✅ Consulta finalizada!")
-    print(f"📊 Documentos encontrados: {resultado['estatisticas']['total_documentos_encontrados']}")
-    print(f"🎯 Documentos relevantes: {resultado['estatisticas']['documentos_relevantes']}")
+    logger.info(f"Consulta finalizada. Documentos encontrados: {resultado['estatisticas']['total_documentos_encontrados']}")
+    logger.info(f"Documentos relevantes para envio: {resultado['estatisticas']['documentos_relevantes']}")
 
 if __name__ == "__main__":
     main()

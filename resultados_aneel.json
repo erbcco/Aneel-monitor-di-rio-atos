@@ -1,16 +1,16 @@
 {
   "estatisticas": {
-    "total_termos_buscados": 21,
+    "total_termos_buscados": 24,
     "total_documentos_encontrados": 0,
     "documentos_por_categoria": {
       "Diamante_Energia": 4,
-      "Porto_Pecem": 4,
+      "Porto_Pecem": 6,
       "Processos_Regulatorios": 5,
-      "Jorge_Lacerda": 7,
+      "Jorge_Lacerda": 8,
       "Comercializacao": 1
     },
     "documentos_relevantes": 0,
-    "data_execucao": "2025-09-23T19:26:28.486483"
+    "data_execucao": "2025-09-23T19:36:48.498478"
   },
   "documentos_relevantes": [],
   "todos_documentos": []

@@ -27,6 +27,7 @@ class AneelScraperFree:
             "Consulta Pública", "Tomada de Subsídio", "CVU", "CER",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia"
+            "Portaria", "Diamante Comercializadora de Energia"
         ]
         
         # Categorização para análise

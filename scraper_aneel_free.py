@@ -22,27 +22,25 @@ class AneelScraperFree:
         
         # Palavras-chave específicas fornecidas
         self.palavras_chave = [
-            "Diamante", "Diamante Energia", "Diamante Geração",
+            "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"
             "Porto do Pecém I", "P. Pecém", "Pecém", "Pecem",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER",
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria"
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
-            "UTLA", "UTLB", "UTLC", "exportação de energia"
-            "Portaria", "Diamante Comercializadora de Energia"
+            "UTLA", "UTLB", "UTLC", "exportação de energia"           
         ]
         
         # Categorização para análise
         self.categorias = {
-            "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração"],
+            "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"],
             "Porto_Pecem": ["Porto do Pecém I", "P. Pecém", "Pecém", "Pecem"],
             "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC"],
-            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER"],
+            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria"],
             "Comercializacao": ["exportação de energia"]
         }
     
     def buscar_por_termo(self, termo):
         """Busca individual por termo específico"""
         params = {
-            'guid': '4aa5bd4e1cb771e263ab',
             'campo1': 'Todos os campos',
             'termo1': termo,
             'conectivo1': 'E'
@@ -160,7 +158,7 @@ class AneelScraperFree:
             'audiência': 'Audiência Pública',
             'tomada de subsídio': 'Tomada de Subsídio',
             'cvv': 'CVU - Custo Variável Unitário',
-            'cer': 'CER - Certificado de Energia Renovável',
+            'cer': 'CER - Contrato de Energia de Reserva',
             'relatório': 'Relatório',
             'ata': 'Ata de Reunião'
         }

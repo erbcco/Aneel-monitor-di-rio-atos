@@ -3,11 +3,8 @@ from bs4 import BeautifulSoup
 import re
 import json
 from datetime import datetime
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import os
 import logging
+import os
 
 try:
     from zoneinfo import ZoneInfo
@@ -28,7 +25,7 @@ class AneelScraperFree:
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria",
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia", "Termelétrica"
         ]
@@ -36,7 +33,7 @@ class AneelScraperFree:
             "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"],
             "Porto_Pecem": ["Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia"],
             "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC"],
-            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria"],
+            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME"],
             "Comercializacao": ["exportação de energia", "Termelétrica"]
         }
         self.data_pesquisa = datetime.now(brasilia_tz).strftime('%d/%m/%Y')
@@ -61,6 +58,11 @@ class AneelScraperFree:
             response.raise_for_status()
             html = response.text
 
+            # Salvando HTML da primeira resposta para debug
+            with open('debug_resposta_busca.html', 'w', encoding='utf-8') as debug_file:
+                debug_file.write(html)
+            logger.info("HTML da resposta inicial salvo em debug_resposta_busca.html")
+
             match = re.search(r"window\.location\s*=\s*'(/Resultado/ListarLegislacao\?guid=[^']+)'", html)
             if not match:
                 logger.warning(f"GUID não encontrado para termo: {termo}")
@@ -78,23 +80,38 @@ class AneelScraperFree:
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(response_result.text)
 
-            # salvar arquivo fixo para teste simples
-            teste_arquivo = os.path.abspath('pagina_resultados_teste.html')
-            with open(teste_arquivo, 'w', encoding='utf-8') as f:
-                f.write('<html><body>Teste fixo de arquivo</body></html>')
-            logger.info(f"Arquivo teste fixo salvo em: {teste_arquivo}")
-
             self.contador_arquivos_html += 1
             logger.info(f"Arquivo salvo com sucesso: {nome_arquivo} (Total arquivos HTML salvos: {self.contador_arquivos_html})")
 
             soup_result = BeautifulSoup(response_result.content, 'html.parser')
-            documentos = self.extrair_documentos(soup_result, termo)
+            documentos = self.extrair_documentos(soup_result, termo)  # Implemente este método conforme a extração necessária
             return documentos
         except Exception as e:
             logger.error(f"Erro ao buscar '{termo}': {e}")
             return []
 
-    # Resto dos métodos permanece igual (extrair_documentos, construir_url_completa, etc.)
+    def executar_consulta_completa(self):
+        resultados = {
+            "estatisticas": {
+                "total_termos_buscados": len(self.palavras_chave),
+                "total_documentos_encontrados": 0,
+                "documentos_por_categoria": {categoria: 0 for categoria in self.categorias},
+                "documentos_relevantes": 0,
+                "data_execucao": datetime.now().isoformat()
+            },
+            "documentos_relevantes": [],
+            "todos_documentos": []
+        }
+
+        for termo in self.palavras_chave:
+            documentos = self.buscar_por_termo(termo)
+            resultados["todos_documentos"].extend(documentos)
+            resultados["estatisticas"]["total_documentos_encontrados"] += len(documentos)
+            # Atualize categorias e relevantes conforme sua lógica
+
+        return resultados
+
+    # Implemente outros métodos necessários como extrair_documentos, construção de URLs completas, etc.
 
 def main():
     logger.info("Iniciando o monitoramento gratuito ANEEL...")

@@ -9,47 +9,14 @@ from email.mime.multipart import MIMEMultipart
 import os
 import logging
 
-from datetime import datetime
-
+# Timezone handling
 try:
-    # Python 3.9+ recomendado
-    from zoneinfo import ZoneInfo
-    brasilia = ZoneInfo("America/Sao_Paulo")
+    from zoneinfo import ZoneInfo  # Python 3.9+
+    brasilia_tz = ZoneInfo("America/Sao_Paulo")
 except ImportError:
-    # fallback: usa pytz se zoneinfo não existir
     import pytz
-    brasilia = pytz.timezone('America/Sao_Paulo')
+    brasilia_tz = pytz.timezone("America/Sao_Paulo")
 
-# Use SEMPRE data de Brasília para qualquer data/hora!
-data_brasilia = datetime.now(brasilia)
-print("Horário Brasília:", data_brasilia.strftime('%d/%m/%Y %H:%M'))
-
-# Exemplo no contexto do seu scraper:
-class AneelScraperFree:
-    def __init__(self):
-        # ...
-        self.brasilia = brasilia
-        self.data_pesquisa = datetime.now(brasilia).strftime('%d/%m/%Y')
-        # ...
-
-    # Exemplo ao salvar data dos documentos:
-    def extrair_documentos(self, soup, termo_busca):
-        # ...
-        documento = {
-            # ...
-            'data_encontrado': datetime.now(self.brasilia).strftime('%Y-%m-%d %H:%M:%S'),
-        }
-
-    # No relatório do e-mail:
-    def enviar_email_gratuito(self, resultado):
-        # ...
-        data_relatorio = datetime.now(self.brasilia)
-        corpo = f"""
-📊 RELATÓRIO DIÁRIO - ANEEL
-Data: {data_relatorio.strftime('%d/%m/%Y às %H:%M')}
-"""
-        # ...
-    
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -62,7 +29,7 @@ class AneelScraperFree:
         }
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
-            "Porto do Pecém", "P. Pecem", "Pecem", "Pecem Energia",
+            "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
             "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia", "Termelétrica"
@@ -74,8 +41,8 @@ class AneelScraperFree:
             "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME"],
             "Comercializacao": ["exportação de energia", "Termelétrica"]
         }
-        self.data_pesquisa = datetime.now(brasilia).strftime('%d/%m/%Y')
-        
+        self.data_pesquisa = datetime.now(brasilia_tz).strftime('%d/%m/%Y')
+
     def buscar_por_termo(self, termo):
         params = {
             'aba': 'Legislacao',
@@ -98,44 +65,40 @@ class AneelScraperFree:
             # Extrai GUID do redirecionamento javascript
             match = re.search(r"window\.location\s*=\s*'(/Resultado/ListarLegislacao\?guid=[^']+)'", html)
             if not match:
-                logger.warning("GUID não encontrado para termo: " + termo)
+                logger.warning(f"GUID não encontrado para termo: {termo}")
                 return []
             url_resultados = "https://biblioteca.aneel.gov.br" + match.group(1)
             logger.info(f"URL resultados: {url_resultados}")
-            
-            # Agora acessa de fato a URL dos resultados
+
             response_result = requests.get(url_resultados, headers=self.headers, timeout=30)
             response_result.raise_for_status()
             soup_result = BeautifulSoup(response_result.content, 'html.parser')
             documentos = self.extrair_documentos(soup_result, termo)
-            
+
             return documentos
         except Exception as e:
             logger.error(f"Erro ao buscar '{termo}': {e}")
             return []
-    
+
     def extrair_documentos(self, soup, termo_busca):
         documentos = []
-        # Seletor correto para listagem de resultados
-        itens = soup.select('div.resultado-legislacao')
+        itens = soup.select('div.ficha-acervo-detalhe')
         if not itens:
-            itens = soup.select('div.col-md-10 > a')
+            logger.warning("Nenhum resultado encontrado para os termos pesquisados.")
         for item in itens:
             try:
-                link = item.find('a', href=True)
-                if link:
-                    titulo = link.get_text(strip=True)
-                    href = link['href']
-                else:
-                    titulo = item.get_text(strip=True)
-                    href = item.get('href')
+                link_tag = item.select_one('a.link-detalhe')
+                if not link_tag:
+                    continue
+                titulo = link_tag.get_text(strip=True)
+                href = link_tag.get('href')
                 url = self.construir_url_completa(href)
                 documento = {
                     'titulo': titulo[:200],
                     'url': url,
                     'tipo': self.identificar_tipo(titulo),
                     'termo_busca': termo_busca,
-                    'data_encontrado': datetime.now(brasilia).strftime('%Y-%m-%d'),
+                    'data_encontrado': datetime.now(brasilia_tz).strftime('%Y-%m-%d %H:%M:%S'),
                     'relevancia': self.calcular_relevancia(titulo, termo_busca),
                     'categoria': self.identificar_categoria(termo_busca)
                 }
@@ -143,9 +106,9 @@ class AneelScraperFree:
             except Exception as e:
                 logger.warning(f"Erro ao processar documento: {e}")
                 continue
-        logger.info(f"{len(documentos)} atos encontrados para '{termo_busca}'")
+        logger.info(f"{len(documentos)} atos encontrados para o termo '{termo_busca}'.")
         return documentos
-    
+
     def construir_url_completa(self, href):
         if not href:
             return ""
@@ -154,7 +117,7 @@ class AneelScraperFree:
         if href.startswith('/'):
             return f"https://biblioteca.aneel.gov.br{href}"
         return f"https://biblioteca.aneel.gov.br/{href}"
-    
+
     def identificar_tipo(self, titulo):
         titulo_lower = titulo.lower()
         tipos = {
@@ -172,7 +135,7 @@ class AneelScraperFree:
             if chave in titulo_lower:
                 return valor
         return 'Documento Regulatório'
-    
+
     def calcular_relevancia(self, titulo, termo_busca):
         titulo_lower = titulo.lower()
         termo_lower = termo_busca.lower()
@@ -184,13 +147,13 @@ class AneelScraperFree:
         if termo_lower in titulo_lower:
             return 'média'
         return 'baixa'
-    
+
     def identificar_categoria(self, termo_busca):
         for categoria, termos in self.categorias.items():
             if termo_busca in termos:
                 return categoria
         return 'Outros'
-    
+
     def executar_consulta_completa(self):
         logger.info("Iniciando consulta completa ANEEL...")
         todos_documentos, estatisticas = [], {
@@ -198,7 +161,7 @@ class AneelScraperFree:
             'total_documentos_encontrados': 0,
             'documentos_por_categoria': {},
             'documentos_relevantes': 0,
-            'data_execucao': datetime.now(brasilia).isoformat()
+            'data_execucao': datetime.now(brasilia_tz).isoformat()
         }
         for termo in self.palavras_chave:
             doc = self.buscar_por_termo(termo)
@@ -223,7 +186,7 @@ class AneelScraperFree:
         self.enviar_email_gratuito(resultado)
         logger.info(f"E-mail enviado com {len(docs_relevantes)} documentos relevantes")
         return resultado
-    
+
     def salvar_resultados(self, resultado):
         try:
             with open('resultados_aneel.json', 'w', encoding='utf-8') as f:
@@ -231,7 +194,7 @@ class AneelScraperFree:
             logger.info("Arquivo resultados_aneel.json salvo com sucesso.")
         except Exception as e:
             logger.error(f"Erro ao salvar resultados: {e}")
-    
+
     def enviar_email_gratuito(self, resultado):
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
@@ -245,16 +208,18 @@ class AneelScraperFree:
             msg = MIMEMultipart()
             msg['From'] = email_user
             msg['To'] = email_to
-            msg['Subject'] = f"[ANEEL] Monitoramento Diário - {datetime.now(brasilia).strftime('%d/%m/%Y')}"
+            msg['Subject'] = f"[ANEEL] Monitoramento Diário - {datetime.now(brasilia_tz).strftime('%d/%m/%Y')}"
             stats = resultado['estatisticas']
             docs_relevantes = resultado['documentos_relevantes']
             corpo = f"""
 📊 RELATÓRIO DIÁRIO - ANEEL
-Data: {datetime.now(brasilia).strftime('%d/%m/%Y às %H:%M')}
+Data: {datetime.now(brasilia_tz).strftime('%d/%m/%Y às %H:%M')}
+
 🔍 ESTATÍSTICAS DA CONSULTA:
 • Termos pesquisados: {stats['total_termos_buscados']}
 • Documentos encontrados: {stats['total_documentos_encontrados']}
 • Documentos relevantes: {stats['documentos_relevantes']}
+
 📋 DOCUMENTOS POR CATEGORIA:
 """
             for cat, qtd in stats['documentos_por_categoria'].items():

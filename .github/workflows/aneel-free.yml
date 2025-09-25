@@ -25,13 +25,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 lxml pytz
 
-      - name: Diagnóstico gravação arquivo
-        run: |
-          echo "Diretório atual: $(pwd)"
-          echo "Arquivos no diretório atual:"
-          ls -l
-          python -c "import os; print('GITHUB_WORKSPACE:', os.getenv('GITHUB_WORKSPACE')); print('Arquivos:', os.listdir('.')); f = open('teste_gravacao_diretorio_atual.html', 'w'); f.write('<html><body>Teste gravação</body></html>'); f.close(); print('Arquivo dummy criado com sucesso')"
-
       - name: 🔍 Executar monitoramento ANEEL
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
@@ -50,8 +43,12 @@ jobs:
             git push || echo "Nada para commitar"
           fi
 
-      - name: Listar todos os arquivos do diretório
-        run: ls -lhR .
+      - name: Listar arquivos HTML gerados e todos arquivos
+        run: |
+          echo "Arquivos HTML no diretório atual e subdiretórios:"
+          find . -name "pagina_resultados*.html" -print -exec ls -lh {} \; || echo "Nenhum arquivo HTML encontrado"
+          echo "Lista completa dos arquivos:"
+          ls -lahR .
 
       - name: 📤 Upload dos arquivos HTML
         if: always()

@@ -32,7 +32,7 @@ jobs:
           EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
         run: python scraper_aneel_free.py
 
-      - name: 💾 Salvar resultados
+      - name: 💾 Salvar resultados no git
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "ANEEL Monitor Bot"
@@ -43,6 +43,16 @@ jobs:
             git push || echo "Nada para commitar"
           fi
 
+      - name: Listar arquivos HTML gerados
+        run: ls -l pagina_resultados_*.html || echo "Nenhum arquivo HTML encontrado"
+
+      - name: 📤 Upload dos arquivos HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arquivos-html
+          path: 'pagina_resultados_*.html'
+
       - name: 📤 Upload resultados como artifact
         uses: actions/upload-artifact@v4
         with:
@@ -50,13 +60,6 @@ jobs:
           path: resultados_aneel.json
           retention-days: 30
         if: always()
-
-      - name: Upload do arquivo HTML
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: arquivos-html
-          path: 'pagina_resultados_*.html'
 
       - name: 📊 Mostrar estatísticas
         run: |

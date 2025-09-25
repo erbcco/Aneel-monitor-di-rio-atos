@@ -77,8 +77,15 @@ class AneelScraperFree:
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(response_result.text)
 
+            # Arquivo dummy para teste de criação física no sistema
+            with open('pagina_resultados_dummy.html', 'w', encoding='utf-8') as f:
+                f.write('<html><body>Teste de escrita dummy</body></html>')
+
             self.contador_arquivos_html += 1
             logger.info(f"Arquivo salvo com sucesso: {nome_arquivo} (Total arquivos HTML salvos: {self.contador_arquivos_html})")
+
+            # Loga todos arquivos no diretório corrente
+            logger.info(f"Arquivos no diretório atualmente: {os.listdir('.')}")
 
             soup_result = BeautifulSoup(response_result.content, 'html.parser')
             documentos = self.extrair_documentos(soup_result, termo)

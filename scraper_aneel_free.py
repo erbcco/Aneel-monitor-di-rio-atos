@@ -17,11 +17,9 @@ class AneelScraperFree:
         self.session = requests.Session()
         self.headers = {'User-Agent': 'Mozilla/5.0'}
         self.palavras_chave = [
-            "Diamante","Diamante Energia","Diamante Geração","Diamante Comercializadora de Energia",
-            "Porto do Pecem","P. Pecem","Pecem","Pecem Energia",
-            "Consulta Pública","Tomada de Subsídio","CVU","CER","Portaria",
-            "Lacerda","J. Lacerda","Jorge Lacerda","CTJL",
-            "UTLA","UTLB","UTLC","exportação de energia","Termelétrica"
+            "Diamante", "Pecem", "Lacerda", "CTJL", "UTLA", "UTLB", "UTLC",
+            "CVU", "CER", "Portaria", "exportação", "Termelétrica",
+            "Consulta Pública", "Tomada de Subsídio"
         ]
         self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
         self.documentos = []
@@ -69,10 +67,16 @@ class AneelScraperFree:
             resp_post = self.session.post(self.base_url, data=data, headers=self.headers)
             resp_post.raise_for_status()
 
-            nome_arquivo = 'resultado_busca_aneel_teste.html'
-            with open(nome_arquivo, 'w', encoding='utf-8') as f:
-                f.write(resp_post.text)
-            logger.info(f"Arquivo HTML salvo: {nome_arquivo}")
+            tamanho_html = len(resp_post.text)
+            logger.info(f"Tamanho do HTML recebido para termo '{termo}': {tamanho_html} caracteres")
+
+            if tamanho_html == 0:
+                logger.warning("HTML vazio recebido, arquivo não será salvo.")
+            else:
+                nome_arquivo = 'resultado_busca_aneel_teste.html'
+                with open(nome_arquivo, 'w', encoding='utf-8') as f:
+                    f.write(resp_post.text)
+                logger.info(f"Arquivo HTML salvo: {nome_arquivo}")
 
             docs = self.extrair_documentos(resp_post.text, termo)
             logger.info(f"Documentos encontrados para '{termo}': {len(docs)}")
@@ -98,7 +102,7 @@ class AneelScraperFree:
         return documentos
 
     def executar_consulta_completa(self):
-        logger.info(f"Iniciando busca para {len(self.palavras_chave)} termos.")
+        logger.info(f"Iniciando busca com {len(self.palavras_chave)} termos.")
         for termo in self.palavras_chave:
             self.buscar_por_termo(termo)
         logger.info(f"Total documentos encontrados: {len(self.documentos)}")

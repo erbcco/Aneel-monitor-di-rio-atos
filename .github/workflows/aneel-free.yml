@@ -11,7 +11,6 @@ permissions:
 jobs:
   monitoramento:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +22,14 @@ jobs:
       - name: 📦 Instalar dependências gratuitas
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 lxml pytz
+          python -m pip install requests beautifulsoup4 lxml pytz
+
+      - name: Diagnóstico gravação arquivo
+        run: |
+          echo "Diretório atual: $(pwd)"
+          echo "Arquivos no diretório atual:"
+          ls -l
+          python -c "import os; print('GITHUB_WORKSPACE:', os.getenv('GITHUB_WORKSPACE')); print('Arquivos:', os.listdir('.')); f = open('teste_gravacao_diretorio_atual.html', 'w'); f.write('<html><body>Teste gravação</body></html>'); f.close(); print('Arquivo dummy criado com sucesso')"
 
       - name: 🔍 Executar monitoramento ANEEL
         env:

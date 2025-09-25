@@ -9,6 +9,47 @@ from email.mime.multipart import MIMEMultipart
 import os
 import logging
 
+from datetime import datetime
+
+try:
+    # Python 3.9+ recomendado
+    from zoneinfo import ZoneInfo
+    brasilia = ZoneInfo("America/Sao_Paulo")
+except ImportError:
+    # fallback: usa pytz se zoneinfo não existir
+    import pytz
+    brasilia = pytz.timezone('America/Sao_Paulo')
+
+# Use SEMPRE data de Brasília para qualquer data/hora!
+data_brasilia = datetime.now(brasilia)
+print("Horário Brasília:", data_brasilia.strftime('%d/%m/%Y %H:%M'))
+
+# Exemplo no contexto do seu scraper:
+class AneelScraperFree:
+    def __init__(self):
+        # ...
+        self.brasilia = brasilia
+        self.data_pesquisa = datetime.now(brasilia).strftime('%d/%m/%Y')
+        # ...
+
+    # Exemplo ao salvar data dos documentos:
+    def extrair_documentos(self, soup, termo_busca):
+        # ...
+        documento = {
+            # ...
+            'data_encontrado': datetime.now(self.brasilia).strftime('%Y-%m-%d %H:%M:%S'),
+        }
+
+    # No relatório do e-mail:
+    def enviar_email_gratuito(self, resultado):
+        # ...
+        data_relatorio = datetime.now(self.brasilia)
+        corpo = f"""
+📊 RELATÓRIO DIÁRIO - ANEEL
+Data: {data_relatorio.strftime('%d/%m/%Y às %H:%M')}
+"""
+        # ...
+    
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,7 +74,7 @@ class AneelScraperFree:
             "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME"],
             "Comercializacao": ["exportação de energia", "Termelétrica"]
         }
-        self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
+        self.data_pesquisa = datetime.now(brasilia).strftime('%d/%m/%Y')
         
     def buscar_por_termo(self, termo):
         params = {
@@ -94,7 +135,7 @@ class AneelScraperFree:
                     'url': url,
                     'tipo': self.identificar_tipo(titulo),
                     'termo_busca': termo_busca,
-                    'data_encontrado': datetime.now().strftime('%Y-%m-%d'),
+                    'data_encontrado': datetime.now(brasilia).strftime('%Y-%m-%d'),
                     'relevancia': self.calcular_relevancia(titulo, termo_busca),
                     'categoria': self.identificar_categoria(termo_busca)
                 }
@@ -157,7 +198,7 @@ class AneelScraperFree:
             'total_documentos_encontrados': 0,
             'documentos_por_categoria': {},
             'documentos_relevantes': 0,
-            'data_execucao': datetime.now().isoformat()
+            'data_execucao': datetime.now(brasilia).isoformat()
         }
         for termo in self.palavras_chave:
             doc = self.buscar_por_termo(termo)
@@ -204,12 +245,12 @@ class AneelScraperFree:
             msg = MIMEMultipart()
             msg['From'] = email_user
             msg['To'] = email_to
-            msg['Subject'] = f"[ANEEL] Monitoramento Diário - {datetime.now().strftime('%d/%m/%Y')}"
+            msg['Subject'] = f"[ANEEL] Monitoramento Diário - {datetime.now(brasilia).strftime('%d/%m/%Y')}"
             stats = resultado['estatisticas']
             docs_relevantes = resultado['documentos_relevantes']
             corpo = f"""
 📊 RELATÓRIO DIÁRIO - ANEEL
-Data: {datetime.now().strftime('%d/%m/%Y às %H:%M')}
+Data: {datetime.now(brasilia).strftime('%d/%m/%Y às %H:%M')}
 🔍 ESTATÍSTICAS DA CONSULTA:
 • Termos pesquisados: {stats['total_termos_buscados']}
 • Documentos encontrados: {stats['total_documentos_encontrados']}

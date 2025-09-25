@@ -1,67 +1,107 @@
-import requests
-from bs4 import BeautifulSoup
-import logging
+import asyncio
+from playwright.async_api import async_playwright
 from datetime import datetime
+import json
+import os
+import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def main():
-    url = "https://biblioteca.aneel.gov.br/Busca/Avancada"
-    session = requests.Session()
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-        "Referer": url,
-        "Origin": "https://biblioteca.aneel.gov.br"
-    }
-    resp = session.get(url, headers=headers)
-    resp.raise_for_status()
+PALAVRAS_CHAVE = ["Portaria"]
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+async def buscar_termo(pagina, termo, data_pesquisa):
+    logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
+    await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada")
+    await pagina.fill('input#ctl00_Conteudo_txtPalavraChave', termo)
+    await pagina.fill('input#ctl00_Conteudo_txtDataInicio', data_pesquisa)
+    await pagina.fill('input#ctl00_Conteudo_txtDataFim', data_pesquisa)
 
-    viewstate = soup.find("input", id="__VIEWSTATE")
-    validation = soup.find("input", id="__EVENTVALIDATION")
-    generator = soup.find("input", id="__VIEWSTATEGENERATOR")
+    await pagina.select_option('select#ctl00_Conteudo_ddlCampoPesquisa', label='Todos os campos')
+    await pagina.select_option('select#ctl00_Conteudo_ddlTipoPesquisa', label='avancada')
 
-    if not (viewstate and validation and generator):
-        logger.error("Campos ocultos não encontrados.")
+    await pagina.click('input#ctl00_Conteudo_btnPesquisar')
+
+    await pagina.wait_for_selector('table.k-grid-table')
+    content = await pagina.content()
+
+    with open(f'resultado_{termo}.html', 'w', encoding='utf-8') as f:
+        f.write(content)
+
+    # Extrair documentos da tabela
+    rows = await pagina.query_selector_all('table.k-grid-table tr')
+    documentos = []
+    for row in rows[1:]:
+        cols = await row.query_selector_all('td')
+        if len(cols) >= 2:
+            titulo = (await cols[1].inner_text()).strip()
+            linkElem = await cols[1].query_selector('a')
+            url = await linkElem.get_attribute('href') if linkElem else None
+            url_completa = f"https://biblioteca.aneel.gov.br{url}" if url else None
+            documentos.append({'termo': termo, 'titulo': titulo, 'url': url_completa})
+    logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
+    return documentos
+
+async def run_scraper():
+    data_pesquisa = datetime.now().strftime('%d/%m/%Y')
+    documentos_totais = []
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+
+        for termo in PALAVRAS_CHAVE:
+            docs = await buscar_termo(page, termo, data_pesquisa)
+            documentos_totais.extend(docs)
+
+        await browser.close()
+
+    with open("resultados_aneel.json", "w", encoding="utf-8") as f:
+        json.dump({
+            'data_execucao': datetime.now().isoformat(),
+            'documentos': documentos_totais
+        }, f, ensure_ascii=False, indent=2)
+
+    if documentos_totais:
+        enviar_email(documentos_totais)
+    else:
+        logger.info("Nenhum documento encontrado, email não será enviado.")
+
+def enviar_email(documentos):
+    remetente = os.getenv("GMAIL_USER")
+    senha = os.getenv("GMAIL_APP_PASSWORD")
+    destinatario = os.getenv("EMAIL_DESTINATARIO")
+
+    if not (remetente and senha and destinatario):
+        logger.error("Variáveis de ambiente para email não configuradas corretamente")
         return
 
-    hoje = datetime.now().strftime("%d/%m/%Y")
+    assunto = f"Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    corpo = "Documentos encontrados:\n\n"
+    for doc in documentos:
+        corpo += f"- {doc['titulo']}: {doc['url']}\n"
 
-    data = {
-        "__VIEWSTATE": viewstate["value"],
-        "__EVENTVALIDATION": validation["value"],
-        "__VIEWSTATEGENERATOR": generator["value"],
-        "ctl00$Conteudo$txtPalavraChave": "Portaria",
-        "ctl00$Conteudo$ddlCampoPesquisa": "Todos",
-        "ctl00$Conteudo$ddlTipoPesquisa": "avancada",
-        "ctl00$Conteudo$txtDataInicio": hoje,
-        "ctl00$Conteudo$txtDataFim": hoje,
-        "ctl00$Conteudo$btnPesquisar": "Buscar"
-    }
+    msg = MIMEMultipart()
+    msg["From"] = remetente
+    msg["To"] = destinatario
+    msg["Subject"] = assunto
+    msg.attach(MIMEText(corpo, 'plain'))
 
-    post_resp = session.post(url, headers=headers, data=data)
-    post_resp.raise_for_status()
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(remetente, senha)
+            server.send_message(msg)
+        logger.info("Email enviado com sucesso.")
+    except Exception as e:
+        logger.error(f"Erro ao enviar email: {e}")
 
-    logger.debug(f"Tamanho resposta POST: {len(post_resp.text)}")
-    with open("resultado.html", "w", encoding="utf-8") as f:
-        f.write(post_resp.text)
-    logger.info("Arquivo resultardo.html salvo para análise")
-
-    soup = BeautifulSoup(post_resp.text, "html.parser")
-    table = soup.find("table", class_="k-grid-table")
-    if not table:
-        logger.warning("Tabela de resultados não encontrada na página")
-    else:
-        rows = table.find_all("tr")[1:]
-        logger.info(f"{len(rows)} resultados encontrados")
-        for r in rows:
-            cols = r.find_all("td")
-            title = cols[1].get_text(strip=True)
-            link = cols[1].find("a")["href"]
-            logger.info(f"Título: {title}, Link: https://biblioteca.aneel.gov.br{link}")
+def main():
+    asyncio.run(run_scraper())
 
 if __name__ == "__main__":
     main()

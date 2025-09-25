@@ -82,4 +82,11 @@ logger.info(f'Arquivo criado: {caminho}')
 
       - name: 📊 Mostrar estatísticas
         run: |
-          python -c "import json; f=open('resultados_aneel.json','r',encoding='utf-8'); data=json.load(f); f.close(); stats=data['estatisticas']; print(f'✅ Execução concluída em: {stats[\"data_execucao\"]}'); print(f'🔍 Termos buscados: {stats[\"total_termos_buscados\"]}'); print(f'📄 Documentos encontrados: {stats[\"total_documentos_encontrados\"]}'); print(f'🎯 Documentos relevantes: {stats[\"documentos_relevantes\"]}'); print('📊 Por categoria:'); [print(f\"  • {cat}: {num}\") for cat, num in stats[\"documentos_por_categoria\"].items()]"
+          python -c "import json; f=open('resultados_aneel.json','r',encoding='utf-8'); data=json.load(f); f.close();
+          stats=data['estatisticas'];
+          print(f'✅ Execução concluída em: {stats[\"data_execucao\"]}');
+          print(f'🔍 Termos buscados: {stats[\"total_termos_buscados\"]}');
+          print(f'📄 Documentos encontrados: {stats[\"total_documentos_encontrados\"]}');
+          print(f'🎯 Documentos relevantes: {stats[\"documentos_relevantes\"]}');
+          print('📊 Por categoria:');
+          [print(f\"  • {cat}: {num}\") for cat, num in stats[\"documentos_por_categoria\"].items()]"

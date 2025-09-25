@@ -24,12 +24,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests beautifulsoup4 lxml pytz
 
-      - name: Diagnóstico gravação arquivo
-        run: |
-          echo "Diretório atual: $(pwd)"
-          echo "Arquivos no diretório atual:"
-          ls -l
-          python -c "import os; print('GITHUB_WORKSPACE:', os.getenv('GITHUB_WORKSPACE')); print('Arquivos:', os.listdir('.')); f = open('teste_gravacao_diretorio_atual.html', 'w'); f.write('<html><body>Teste gravação</body></html>'); f.close(); print('Arquivo dummy criado com sucesso')"
+      - name: Teste simples de gravação arquivo
+        run: python teste_gravacao_simples.py
 
       - name: 🔍 Executar monitoramento ANEEL
         env:

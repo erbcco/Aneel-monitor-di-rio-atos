@@ -34,9 +34,23 @@ class AneelScraperFree:
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, 'html.parser')
 
-            viewstate = soup.select_one('input[name="__VIEWSTATE"]')['value']
-            eventvalidation = soup.select_one('input[name="__EVENTVALIDATION"]')['value']
-            viewstategenerator = soup.select_one('input[name="__VIEWSTATEGENERATOR"]')['value']
+            viewstate_input = soup.select_one('input[name="__VIEWSTATE"]')
+            if not viewstate_input:
+                logger.error("Campo __VIEWSTATE não encontrado no HTML retornado.")
+                return []
+            viewstate = viewstate_input['value']
+
+            eventvalidation_input = soup.select_one('input[name="__EVENTVALIDATION"]')
+            if not eventvalidation_input:
+                logger.error("Campo __EVENTVALIDATION não encontrado no HTML retornado.")
+                return []
+            eventvalidation = eventvalidation_input['value']
+
+            viewstategenerator_input = soup.select_one('input[name="__VIEWSTATEGENERATOR"]')
+            if not viewstategenerator_input:
+                logger.error("Campo __VIEWSTATEGENERATOR não encontrado no HTML retornado.")
+                return []
+            viewstategenerator = viewstategenerator_input['value']
 
             data = {
                 '__EVENTTARGET': '',
@@ -56,7 +70,7 @@ class AneelScraperFree:
             resp_post = self.session.post(self.base_url, data=data, headers=self.headers)
             resp_post.raise_for_status()
 
-            # Salvar arquivo fixo de teste
+            # Salvar resultado fixo para análise
             nome_arquivo = 'resultado_busca_aneel_teste.html'
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(resp_post.text)

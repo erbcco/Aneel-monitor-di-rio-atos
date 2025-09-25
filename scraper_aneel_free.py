@@ -28,7 +28,7 @@ class AneelScraperFree:
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia", "Termelétrica"
         ]
@@ -36,7 +36,7 @@ class AneelScraperFree:
             "Diamante_Energia": ["Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia"],
             "Porto_Pecem": ["Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia"],
             "Jorge_Lacerda": ["Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL", "UTLA", "UTLB", "UTLC"],
-            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME"],
+            "Processos_Regulatorios": ["Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria"],
             "Comercializacao": ["exportação de energia", "Termelétrica"]
         }
         self.data_pesquisa = datetime.now(brasilia_tz).strftime('%d/%m/%Y')

@@ -21,7 +21,7 @@ class AneelScraperFree:
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia", "Termelétrica"
         ]
@@ -38,19 +38,19 @@ class AneelScraperFree:
             if not viewstate_input:
                 logger.error("Campo __VIEWSTATE não encontrado no HTML retornado.")
                 return []
-            viewstate = viewstate_input['value']
+            viewstate = viewstate_input.get('value', '')
 
             eventvalidation_input = soup.select_one('input[name="__EVENTVALIDATION"]')
             if not eventvalidation_input:
                 logger.error("Campo __EVENTVALIDATION não encontrado no HTML retornado.")
                 return []
-            eventvalidation = eventvalidation_input['value']
+            eventvalidation = eventvalidation_input.get('value', '')
 
             viewstategenerator_input = soup.select_one('input[name="__VIEWSTATEGENERATOR"]')
             if not viewstategenerator_input:
                 logger.error("Campo __VIEWSTATEGENERATOR não encontrado no HTML retornado.")
                 return []
-            viewstategenerator = viewstategenerator_input['value']
+            viewstategenerator = viewstategenerator_input.get('value', '')
 
             data = {
                 '__EVENTTARGET': '',
@@ -70,7 +70,6 @@ class AneelScraperFree:
             resp_post = self.session.post(self.base_url, data=data, headers=self.headers)
             resp_post.raise_for_status()
 
-            # Salvar resultado fixo para análise
             nome_arquivo = 'resultado_busca_aneel_teste.html'
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(resp_post.text)
@@ -102,6 +101,7 @@ class AneelScraperFree:
             self.buscar_por_termo(termo)
         logger.info(f"Total documentos encontrados: {len(self.documentos)}")
         self.salvar_resultados()
+
         if self.documentos:
             self.enviar_email_resultados()
         else:
@@ -112,7 +112,7 @@ class AneelScraperFree:
             "estatisticas": {
                 "total_termos_buscados": len(self.palavras_chave),
                 "total_documentos_encontrados": len(self.documentos),
-                "data_execucao": datetime.now().isoformat()
+                "data_execucao": datetime.now().isoformat(),
             },
             "documentos_relevantes": self.documentos,
             "todos_documentos": self.documentos

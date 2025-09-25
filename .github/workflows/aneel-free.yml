@@ -20,17 +20,32 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Instalar dependências
+      - name: Instalar dependências e salvar log
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install requests beautifulsoup4 lxml pytz
+          python -m pip install --upgrade pip > install_log.txt 2>&1
+          python -m pip install requests beautifulsoup4 lxml pytz >> install_log.txt 2>&1 || true
+          cat install_log.txt
 
-      - name: Executar scraper ANEEL avançado
+      - name: Executar scraper e salvar log
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
-        run: python scraper_aneel_free.py
+        run: |
+          python scraper_aneel_free.py > scraper_log.txt 2>&1 || true
+          cat scraper_log.txt
+
+      - name: Upload logs instalação
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-install
+          path: install_log.txt
+
+      - name: Upload logs scraper
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-scraper
+          path: scraper_log.txt
 
       - name: Upload arquivo HTML fixo do resultado
         uses: actions/upload-artifact@v4
@@ -40,18 +55,6 @@ jobs:
 
       - name: Listar arquivos HTML gerados
         run: ls -lah resultado_busca_aneel_teste.html || echo "Nenhum arquivo HTML gerado"
-
-      - name: Upload logs scraper
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-scraper
-          path: scraper_log.txt
-
-      - name: Upload logs instalação
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-install
-          path: install_log.txt
 
       - name: Upload JSON resultados
         uses: actions/upload-artifact@v4

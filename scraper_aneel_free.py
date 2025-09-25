@@ -15,9 +15,7 @@ class AneelScraperFree:
     def __init__(self):
         self.base_url = "https://biblioteca.aneel.gov.br/Busca/Avancada"
         self.session = requests.Session()
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0'
-        }
+        self.headers = {'User-Agent': 'Mozilla/5.0'}
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
@@ -30,25 +28,27 @@ class AneelScraperFree:
 
     def buscar_por_termo(self, termo):
         try:
+            logger.info(f"Iniciando busca pelo termo: '{termo}'")
             resp = self.session.get(self.base_url, headers=self.headers)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, 'html.parser')
 
+            # Campos ocultos com validação
             viewstate_input = soup.select_one('input[name="__VIEWSTATE"]')
             if not viewstate_input:
-                logger.error("Campo __VIEWSTATE não encontrado no HTML retornado.")
+                logger.error("Campo __VIEWSTATE não encontrado.")
                 return []
             viewstate = viewstate_input.get('value', '')
 
             eventvalidation_input = soup.select_one('input[name="__EVENTVALIDATION"]')
             if not eventvalidation_input:
-                logger.error("Campo __EVENTVALIDATION não encontrado no HTML retornado.")
+                logger.error("Campo __EVENTVALIDATION não encontrado.")
                 return []
             eventvalidation = eventvalidation_input.get('value', '')
 
             viewstategenerator_input = soup.select_one('input[name="__VIEWSTATEGENERATOR"]')
             if not viewstategenerator_input:
-                logger.error("Campo __VIEWSTATEGENERATOR não encontrado no HTML retornado.")
+                logger.error("Campo __VIEWSTATEGENERATOR não encontrado.")
                 return []
             viewstategenerator = viewstategenerator_input.get('value', '')
 
@@ -73,13 +73,14 @@ class AneelScraperFree:
             nome_arquivo = 'resultado_busca_aneel_teste.html'
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(resp_post.text)
-            logger.info(f"Salvo resultado da busca em {nome_arquivo}")
+            logger.info(f"Arquivo HTML salvo: {nome_arquivo}")
 
             docs = self.extrair_documentos(resp_post.text, termo)
+            logger.info(f"Documentos encontrados para '{termo}': {len(docs)}")
             self.documentos.extend(docs)
             return docs
         except Exception as e:
-            logger.error(f"Erro na busca do termo '{termo}': {e}")
+            logger.error(f"Erro buscando termo '{termo}': {e}")
             return []
 
     def extrair_documentos(self, html_content, termo):
@@ -101,7 +102,6 @@ class AneelScraperFree:
             self.buscar_por_termo(termo)
         logger.info(f"Total documentos encontrados: {len(self.documentos)}")
         self.salvar_resultados()
-
         if self.documentos:
             self.enviar_email_resultados()
         else:
@@ -119,7 +119,7 @@ class AneelScraperFree:
         }
         with open("resultados_aneel.json", "w", encoding="utf-8") as f:
             json.dump(resultados, f, ensure_ascii=False, indent=2)
-        logger.info("Resultados salvos em resultados_aneel.json")
+        logger.info("Arquivo resultados_aneel.json salvo.")
 
     def enviar_email_resultados(self):
         try:
@@ -148,10 +148,10 @@ class AneelScraperFree:
             logger.error(f"Erro ao enviar e-mail: {e}")
 
 def main():
-    logger.info("Iniciando o monitoramento gratuito ANEEL...")
+    logger.info("Iniciando monitoramento ANEEL...")
     scraper = AneelScraperFree()
     scraper.executar_consulta_completa()
-    logger.info("Monitoramento finalizado.")
+    logger.info("Monitoramento ANEEL finalizado.")
 
 if __name__ == "__main__":
     main()

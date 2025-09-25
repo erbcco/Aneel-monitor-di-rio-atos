@@ -72,9 +72,14 @@ class AneelScraperFree:
 
             response_result = requests.get(url_resultados, headers=self.headers, timeout=30)
             response_result.raise_for_status()
+            
+            # Salvar o HTML para análise
+            with open('pagina_resultados.html', 'w', encoding='utf-8') as f:
+                f.write(response_result.text)
+            logger.info(f"HTML da página de resultados salvo em pagina_resultados_{termo.replace(' ', '_')}.html")
+            
             soup_result = BeautifulSoup(response_result.content, 'html.parser')
             documentos = self.extrair_documentos(soup_result, termo)
-
             return documentos
         except Exception as e:
             logger.error(f"Erro ao buscar '{termo}': {e}")

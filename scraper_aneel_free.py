@@ -15,7 +15,24 @@ class AneelScraperFree:
     def __init__(self):
         self.base_url = "https://biblioteca.aneel.gov.br/Busca/Avancada"
         self.session = requests.Session()
-        self.headers = {'User-Agent': 'Mozilla/5.0'}
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                          'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                          'Chrome/116.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://biblioteca.aneel.gov.br/Busca/Avancada',
+            'Origin': 'https://biblioteca.aneel.gov.br',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'TE': 'trailers',
+        })
         self.palavras_chave = [
             "Diamante", "Pecem", "Lacerda", "CTJL", "UTLA", "UTLB", "UTLC",
             "CVU", "CER", "Portaria", "exportação", "Termelétrica",
@@ -27,7 +44,8 @@ class AneelScraperFree:
     def buscar_por_termo(self, termo):
         try:
             logger.info(f"Buscando termo: '{termo}'")
-            resp = self.session.get(self.base_url, headers=self.headers)
+
+            resp = self.session.get(self.base_url)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, 'html.parser')
 
@@ -64,7 +82,7 @@ class AneelScraperFree:
                 'ctl00$Conteudo$btnPesquisar': 'Buscar'
             }
 
-            resp_post = self.session.post(self.base_url, data=data, headers=self.headers)
+            resp_post = self.session.post(self.base_url, data=data)
             resp_post.raise_for_status()
 
             tamanho_html = len(resp_post.text)

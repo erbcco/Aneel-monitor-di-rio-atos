@@ -9,57 +9,38 @@ permissions:
   contents: write
 
 jobs:
-  monitoramento:
+  scraper:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Setup Python
+    - uses: actions/checkout@v4
+    - name: Setup Python 3.11
       uses: actions/setup-python@v4
       with:
         python-version: 3.11
-
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip > install_log.txt 2>&1
-        python -m pip install requests beautifulsoup4 lxml pytz >> install_log.txt 2>&1
-        cat install_log.txt
-
-    - name: Run scraper and capture logs
+        python -m pip install --upgrade pip
+        python -m pip install requests beautifulsoup4 lxml pytz
+    - name: Run scraper
       env:
         GMAIL_USER: ${{ secrets.GMAIL_USER }}
         GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
+        EMAIL_DESTINARIO: ${{ secrets.EMAIL_DESTINARIO }}
       run: |
-        python scraper_aneel_free.py > scraper_log.txt 2>&1
-        cat scraper_log.txt
-
-    - name: Upload install logs
-      uses: actions/upload-artifact@v4
+        python scraper_aneel.py > scraper.log 2>&1
+        cat scraper.log
+    - name: Upload logs
+      uses: actions/upload-artifact@v3
       with:
-        name: logs-install
-        path: install_log.txt
-
-    - name: Upload scraper logs
-      uses: actions/upload-artifact@v4
-      with:
-        name: logs-scraper
-        path: scraper_log.txt
-
-    - name: Upload busca resultado HTML
-      uses: actions/upload-artifact@v4
-      with:
-        name: resultado-busca-aneel
-        path: resultado_busca_aneel_teste.html
-
-    - name: Verificar arquivo HTML
-      run: |
-        ls -lh resultado_busca_aneel_teste.html || echo "Nenhum arquivo HTML gerado"
-
+        name: logs
+        path: scraper.log
     - name: Upload resultados JSON
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: resultados-json
         path: resultados_aneel.json
+    - name: Upload arquivo HTML
+      uses: actions/upload-artifact@v3
+      with:
+        name: resultado-html
+        path: resultado_busca_aneel.html

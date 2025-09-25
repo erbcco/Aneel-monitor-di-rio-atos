@@ -17,23 +17,22 @@ class AneelScraperFree:
         self.session = requests.Session()
         self.headers = {'User-Agent': 'Mozilla/5.0'}
         self.palavras_chave = [
-            "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
-            "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria",
-            "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
-            "UTLA", "UTLB", "UTLC", "exportação de energia", "Termelétrica"
+            "Diamante","Diamante Energia","Diamante Geração","Diamante Comercializadora de Energia",
+            "Porto do Pecem","P. Pecem","Pecem","Pecem Energia",
+            "Consulta Pública","Tomada de Subsídio","CVU","CER","Portaria",
+            "Lacerda","J. Lacerda","Jorge Lacerda","CTJL",
+            "UTLA","UTLB","UTLC","exportação de energia","Termelétrica"
         ]
         self.data_pesquisa = datetime.now().strftime('%d/%m/%Y')
         self.documentos = []
 
     def buscar_por_termo(self, termo):
         try:
-            logger.info(f"Iniciando busca pelo termo: '{termo}'")
+            logger.info(f"Buscando termo: '{termo}'")
             resp = self.session.get(self.base_url, headers=self.headers)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, 'html.parser')
 
-            # Campos ocultos com validação
             viewstate_input = soup.select_one('input[name="__VIEWSTATE"]')
             if not viewstate_input:
                 logger.error("Campo __VIEWSTATE não encontrado.")
@@ -78,9 +77,10 @@ class AneelScraperFree:
             docs = self.extrair_documentos(resp_post.text, termo)
             logger.info(f"Documentos encontrados para '{termo}': {len(docs)}")
             self.documentos.extend(docs)
+            logger.info(f"Documentos acumulados até agora: {len(self.documentos)}")
             return docs
         except Exception as e:
-            logger.error(f"Erro buscando termo '{termo}': {e}")
+            logger.error(f"Erro na busca do termo '{termo}': {e}")
             return []
 
     def extrair_documentos(self, html_content, termo):
@@ -98,6 +98,7 @@ class AneelScraperFree:
         return documentos
 
     def executar_consulta_completa(self):
+        logger.info(f"Iniciando busca para {len(self.palavras_chave)} termos.")
         for termo in self.palavras_chave:
             self.buscar_por_termo(termo)
         logger.info(f"Total documentos encontrados: {len(self.documentos)}")
@@ -115,7 +116,7 @@ class AneelScraperFree:
                 "data_execucao": datetime.now().isoformat(),
             },
             "documentos_relevantes": self.documentos,
-            "todos_documentos": self.documentos
+            "todos_documentos": self.documentos,
         }
         with open("resultados_aneel.json", "w", encoding="utf-8") as f:
             json.dump(resultados, f, ensure_ascii=False, indent=2)
@@ -138,11 +139,10 @@ class AneelScraperFree:
             msg['Subject'] = assunto
             msg.attach(MIMEText(corpo, 'plain'))
 
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(remetente, senha)
-            server.sendmail(remetente, destinatario, msg.as_string())
-            server.quit()
+            with smtplib.SMTP('smtp.gmail.com', 587) as server:
+                server.starttls()
+                server.login(remetente, senha)
+                server.sendmail(remetente, destinatario, msg.as_string())
             logger.info(f"E-mail enviado para {destinatario}")
         except Exception as e:
             logger.error(f"Erro ao enviar e-mail: {e}")

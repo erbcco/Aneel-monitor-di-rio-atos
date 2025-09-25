@@ -11,18 +11,9 @@ permissions:
 jobs:
   monitoramento:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Executar monitoramento
-        run: python seu_script.py
-
-      - name: Upload do arquivo HTML
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: arquivos-html
-          path: 'pagina_resultados_*.html'
 
       - name: 🐍 Configurar Python
         uses: actions/setup-python@v4
@@ -33,13 +24,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 lxml
+
       - name: 🔍 Executar monitoramento ANEEL
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
-        run: |
-          python scraper_aneel_free.py
+        run: python scraper_aneel_free.py
+
       - name: 💾 Salvar resultados
         run: |
           git config --local user.email "action@github.com"
@@ -50,13 +42,21 @@ jobs:
               git commit -m "📊 Resultados ANEEL $(date +'%Y-%m-%d %H:%M') [skip ci]"
             git push || echo "Nada para commitar"
           fi
+
       - name: 📤 Upload resultados como artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: aneel-results-${{ github.run_number }}
           path: resultados_aneel.json
           retention-days: 30
         if: always()
+
+      - name: Upload do arquivo HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arquivos-html
+          path: 'pagina_resultados_*.html'
 
       - name: 📊 Mostrar estatísticas
         run: |

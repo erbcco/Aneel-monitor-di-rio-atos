@@ -82,16 +82,14 @@ class AneelScraperFree:
 
     def extrair_documentos(self, soup, termo_busca):
         documentos = []
-        itens = soup.select('div.ficha-acervo-detalhe')
-        if not itens:
-            logger.warning("Nenhum resultado encontrado para os termos pesquisados.")
-        for item in itens:
+        # Seletor ajustado para estrutura real da página
+        resultados = soup.select('div.col-md-10 > a')
+        if not resultados:
+            logger.warning("Nenhum documento encontrado nos seletores testados.")
+        for resultado in resultados[:10]:
             try:
-                link_tag = item.select_one('a.link-detalhe')
-                if not link_tag:
-                    continue
-                titulo = link_tag.get_text(strip=True)
-                href = link_tag.get('href')
+                titulo = resultado.get_text(strip=True)
+                href = resultado.get('href')
                 url = self.construir_url_completa(href)
                 documento = {
                     'titulo': titulo[:200],

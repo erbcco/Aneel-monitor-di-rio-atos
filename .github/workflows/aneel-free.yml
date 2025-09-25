@@ -2,7 +2,7 @@ name: Monitoramento ANEEL
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'
+    - cron: '0 12 * * 1-5'  # Segunda a sexta às 9:00 BRT (12:00 UTC)
   workflow_dispatch:
 
 permissions:
@@ -20,96 +20,41 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Instalar dependências com log salvo
-        id: install
+      - name: Instalar dependências
         run: |
-          python -m pip install --upgrade pip -v --no-cache-dir > install_log.txt 2>&1
-          python -m pip install requests beautifulsoup4 lxml pytz -v --no-cache-dir >> install_log.txt 2>&1
-        continue-on-error: true
+          python -m pip install --upgrade pip
+          python -m pip install requests beautifulsoup4 lxml pytz
 
-      - name: Salvar log instalação
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: install-log-${{ github.run_number }}
-          path: install_log.txt
-
-      - name: Testar permissão simples
-        run: |
-          echo "Teste de escrita no diretório atual" > arquivo_teste.txt
-          cat arquivo_teste.txt
-
-      - name: Diagnóstico gravação arquivo simplificado
-        run: |
-          echo "Diretório atual: $(pwd)"
-          echo "Listar arquivos:"
-          ls -l
-          echo "Criar arquivo de teste simples"
-          echo "<html><body>Teste simples</body></html>" > teste_gravacao_simples.html
-          ls -l
-
-      - name: Executar monitoramento ANEEL com log salvo
-        id: run_scraper
+      - name: Executar scraper ANEEL avançado
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
-        run: python scraper_aneel_free.py > scraper_log.txt 2>&1
-        continue-on-error: true
+        run: python scraper_aneel_free.py
 
-      - name: Salvar log scraper
-        if: always()
+      - name: Upload arquivos HTML gerados
         uses: actions/upload-artifact@v4
         with:
-          name: scraper-log-${{ github.run_number }}
+          name: resultado-busca-aneel
+          path: resultado_*.html
+
+      - name: Listar arquivos gerados
+        run: ls -lah resultado_*.html || echo "Nenhum arquivo HTML gerado"
+
+      - name: Upload logs scraper
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-scraper
           path: scraper_log.txt
 
-      - name: Upload debug resposta HTML
-        if: always()
+      - name: Upload logs instalação
         uses: actions/upload-artifact@v4
         with:
-          name: debug-resposta-html-${{ github.run_number }}
-          path: debug_resposta_busca.html
+          name: logs-install
+          path: install_log.txt
 
-      - name: 💾 Salvar resultados no git
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "ANEEL Monitor Bot"
-          if [ -f "resultados_aneel.json" ]; then
-            git add resultados_aneel.json
-            git diff --quiet && git diff --staged --quiet || \
-              git commit -m "📊 Resultados ANEEL $(date +'%Y-%m-%d %H:%M') [skip ci]"
-            git push || echo "Nada para commitar"
-          fi
-
-      - name: Listar arquivos HTML gerados e todos arquivos
-        run: |
-          echo "Arquivos HTML no diretório atual e subdiretórios:"
-          find . -name "pagina_resultados*.html" -print -exec ls -lh {} \; || echo "Nenhum arquivo HTML encontrado"
-          echo "Lista completa dos arquivos:"
-          ls -lahR .
-
-      - name: 📤 Upload dos arquivos HTML
-        if: always()
+      - name: Upload JSON resultados
         uses: actions/upload-artifact@v4
         with:
-          name: arquivos-html
-          path: 'pagina_resultados_*.html'
-
-      - name: 📤 Upload resultados como artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: aneel-results-${{ github.run_number }}
+          name: resultados-json
           path: resultados_aneel.json
-          retention-days: 30
-
-      - name: 📊 Mostrar estatísticas
-        run: |
-          python -c "import json; f=open('resultados_aneel.json','r',encoding='utf-8'); data=json.load(f); f.close();
-          stats=data['estatisticas'];
-          print(f'✅ Execução concluída em: {stats[\"data_execucao\"]}');
-          print(f'🔍 Termos buscados: {stats[\"total_termos_buscados\"]}');
-          print(f'📄 Documentos encontrados: {stats[\"total_documentos_encontrados\"]}');
-          print(f'🎯 Documentos relevantes: {stats[\"documentos_relevantes\"]}');
-          print('📊 Por categoria:');
-          [print(f\"  • {cat}: {num}\") for cat, num in stats[\"documentos_por_categoria\"].items()]"

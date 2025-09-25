@@ -32,14 +32,14 @@ jobs:
           EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
         run: python scraper_aneel_free.py
 
-      - name: Upload arquivos HTML gerados
+      - name: Upload arquivo HTML fixo do resultado
         uses: actions/upload-artifact@v4
         with:
           name: resultado-busca-aneel
-          path: resultado_*.html
+          path: resultado_busca_aneel_teste.html
 
-      - name: Listar arquivos gerados
-        run: ls -lah resultado_*.html || echo "Nenhum arquivo HTML gerado"
+      - name: Listar arquivos HTML gerados
+        run: ls -lah resultado_busca_aneel_teste.html || echo "Nenhum arquivo HTML gerado"
 
       - name: Upload logs scraper
         uses: actions/upload-artifact@v4

@@ -73,10 +73,13 @@ class AneelScraperFree:
             response_result = requests.get(url_resultados, headers=self.headers, timeout=30)
             response_result.raise_for_status()
             
-            # Salvar o HTML para análise
-            with open('pagina_resultados.html', 'w', encoding='utf-8') as f:
+            nome_arquivo = f'pagina_resultados_{termo.replace(" ", "_")}.html'
+            logger.info(f"Salvando arquivo HTML para termo: {termo} no arquivo: {nome_arquivo}")
+            
+            with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(response_result.text)
-            logger.info(f"HTML da página de resultados salvo em pagina_resultados_{termo.replace(' ', '_')}.html")
+            
+            logger.info(f"HTML da página de resultados salvo em {nome_arquivo}")
             
             soup_result = BeautifulSoup(response_result.content, 'html.parser')
             documentos = self.extrair_documentos(soup_result, termo)
@@ -87,7 +90,6 @@ class AneelScraperFree:
 
     def extrair_documentos(self, soup, termo_busca):
         documentos = []
-        # Seletor ajustado para estrutura real da página
         resultados = soup.select('div.col-md-10 > a')
         if not resultados:
             logger.warning("Nenhum documento encontrado nos seletores testados.")

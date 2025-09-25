@@ -28,7 +28,7 @@ jobs:
       - name: Diagnóstico gravação arquivo
         run: |
           echo "Iniciando diagnóstico de gravação"
-          python -c "
+          python - <<EOF
 import os
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +43,7 @@ caminho = os.path.join(cwd, 'teste_gravacao_diretorio_atual.html')
 with open(caminho, 'w') as f:
     f.write('<html><body>Teste gravação</body></html>')
 logger.info(f'Arquivo criado: {caminho}')
-"
+EOF
 
       - name: 🔍 Executar monitoramento ANEEL
         env:

@@ -11,6 +11,7 @@ permissions:
 jobs:
   monitoramento:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,13 +20,24 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Testar permissão simples
+        run: |
+          echo "Teste de escrita no diretório atual" > arquivo_teste.txt
+          cat arquivo_teste.txt
+
       - name: 📦 Instalar dependências gratuitas
         run: |
           python -m pip install --upgrade pip
           python -m pip install requests beautifulsoup4 lxml pytz
 
-      - name: Teste simples de gravação arquivo
-        run: python teste_gravacao_simples.py
+      - name: Diagnóstico gravação arquivo simplificado
+        run: |
+          echo "Diretório atual: $(pwd)"
+          echo "Listar arquivos:"
+          ls -l
+          echo "Criar arquivo de teste simples"
+          echo "<html><body>Teste simples</body></html>" > teste_gravacao_simples.html
+          ls -l
 
       - name: 🔍 Executar monitoramento ANEEL
         env:

@@ -21,7 +21,7 @@ class AneelScraperFree:
         self.palavras_chave = [
             "Diamante", "Diamante Energia", "Diamante Geração", "Diamante Comercializadora de Energia",
             "Porto do Pecem", "P. Pecem", "Pecem", "Pecem Energia",
-            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria",
+            "Consulta Pública", "Tomada de Subsídio", "CVU", "CER", "Portaria MME",
             "Lacerda", "J. Lacerda", "Jorge Lacerda", "CTJL",
             "UTLA", "UTLB", "UTLC", "exportação de energia", "Termelétrica"
         ]
@@ -56,7 +56,8 @@ class AneelScraperFree:
             resp_post = self.session.post(self.base_url, data=data, headers=self.headers)
             resp_post.raise_for_status()
 
-            nome_arquivo = f"resultado_{termo.replace(' ', '_')}_{self.data_pesquisa.replace('/', '-')}.html"
+            # Salvar arquivo fixo de teste
+            nome_arquivo = 'resultado_busca_aneel_teste.html'
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(resp_post.text)
             logger.info(f"Salvo resultado da busca em {nome_arquivo}")
@@ -108,7 +109,6 @@ class AneelScraperFree:
 
     def enviar_email_resultados(self):
         try:
-            import os
             remetente = os.getenv("GMAIL_USER")
             senha = os.getenv("GMAIL_APP_PASSWORD")
             destinatario = os.getenv("EMAIL_DESTINATARIO")

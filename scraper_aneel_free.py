@@ -71,21 +71,15 @@ class AneelScraperFree:
             response_result = requests.get(url_resultados, headers=self.headers, timeout=30)
             response_result.raise_for_status()
 
-            nome_arquivo = f'pagina_resultados_{termo.replace(" ", "_")}.html'
+            workspace = os.getenv('GITHUB_WORKSPACE', '.')
+            nome_arquivo = os.path.join(workspace, f'pagina_resultados_{termo.replace(" ", "_")}.html')
             logger.info(f"Salvando arquivo HTML: {nome_arquivo}")
 
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(response_result.text)
 
-            # Arquivo dummy para teste de criação física no sistema
-            with open('pagina_resultados_dummy.html', 'w', encoding='utf-8') as f:
-                f.write('<html><body>Teste de escrita dummy</body></html>')
-
             self.contador_arquivos_html += 1
             logger.info(f"Arquivo salvo com sucesso: {nome_arquivo} (Total arquivos HTML salvos: {self.contador_arquivos_html})")
-
-            # Loga todos arquivos no diretório corrente
-            logger.info(f"Arquivos no diretório atualmente: {os.listdir('.')}")
 
             soup_result = BeautifulSoup(response_result.content, 'html.parser')
             documentos = self.extrair_documentos(soup_result, termo)

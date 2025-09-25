@@ -9,15 +9,13 @@ from email.mime.multipart import MIMEMultipart
 import os
 import logging
 
-# Timezone handling
 try:
-    from zoneinfo import ZoneInfo  # Python 3.9+
+    from zoneinfo import ZoneInfo
     brasilia_tz = ZoneInfo("America/Sao_Paulo")
 except ImportError:
     import pytz
     brasilia_tz = pytz.timezone("America/Sao_Paulo")
 
-# Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -42,6 +40,7 @@ class AneelScraperFree:
             "Comercializacao": ["exportação de energia", "Termelétrica"]
         }
         self.data_pesquisa = datetime.now(brasilia_tz).strftime('%d/%m/%Y')
+        self.contador_arquivos_html = 0
 
     def buscar_por_termo(self, termo):
         params = {
@@ -62,7 +61,6 @@ class AneelScraperFree:
             response.raise_for_status()
             html = response.text
 
-            # Extrai GUID do redirecionamento javascript
             match = re.search(r"window\.location\s*=\s*'(/Resultado/ListarLegislacao\?guid=[^']+)'", html)
             if not match:
                 logger.warning(f"GUID não encontrado para termo: {termo}")
@@ -72,15 +70,16 @@ class AneelScraperFree:
 
             response_result = requests.get(url_resultados, headers=self.headers, timeout=30)
             response_result.raise_for_status()
-            
+
             nome_arquivo = f'pagina_resultados_{termo.replace(" ", "_")}.html'
-            logger.info(f"Salvando arquivo HTML para termo: {termo} no arquivo: {nome_arquivo}")
-            
+            logger.info(f"Salvando arquivo HTML: {nome_arquivo}")
+
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
                 f.write(response_result.text)
-            
-            logger.info(f"HTML da página de resultados salvo em {nome_arquivo}")
-            
+
+            self.contador_arquivos_html += 1
+            logger.info(f"Arquivo salvo com sucesso: {nome_arquivo} (Total arquivos HTML salvos: {self.contador_arquivos_html})")
+
             soup_result = BeautifulSoup(response_result.content, 'html.parser')
             documentos = self.extrair_documentos(soup_result, termo)
             return documentos

@@ -35,13 +35,13 @@ jobs:
           python scraper_aneel_free.py > scraper_log.txt 2>&1
           cat scraper_log.txt
 
-      - name: Upload logs instalação
+      - name: Upload logs de instalação
         uses: actions/upload-artifact@v4
         with:
           name: logs-install
           path: install_log.txt
 
-      - name: Upload logs scraper
+      - name: Upload logs do scraper
         uses: actions/upload-artifact@v4
         with:
           name: logs-scraper
@@ -53,10 +53,10 @@ jobs:
           name: resultado-busca-aneel
           path: resultado_busca_aneel_teste.html
 
-      - name: Listar arquivos HTML gerados
+      - name: Listar arquivos HTML
         run: ls -lah resultado_busca_aneel_teste.html || echo "Nenhum arquivo HTML gerado"
 
-      - name: Upload JSON resultados
+      - name: Upload dos resultados JSON
         uses: actions/upload-artifact@v4
         with:
           name: resultados-json

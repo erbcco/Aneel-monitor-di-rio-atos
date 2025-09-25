@@ -2,7 +2,7 @@ name: Monitoramento ANEEL
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'  # Segunda a sexta às 9:00 BRT (12:00 UTC)
+    - cron: '0 12 * * 1-5'
   workflow_dispatch:
 
 permissions:
@@ -15,17 +15,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 🐍 Setup Python
+      - name: Configurar Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Instalar dependências e salvar log
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install requests beautifulsoup4 lxml pytz
+          python -m pip install --upgrade pip > install_log.txt 2>&1
+          python -m pip install requests beautifulsoup4 lxml pytz >> install_log.txt 2>&1
+          cat install_log.txt
 
-      - name: Run scraper with logs
+      - name: Executar scraper com log para arquivo
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
@@ -34,19 +35,28 @@ jobs:
           python scraper_aneel_free.py > scraper_log.txt 2>&1
           cat scraper_log.txt
 
-      - name: Upload scraper logs
+      - name: Upload logs instalação
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-install
+          path: install_log.txt
+
+      - name: Upload logs scraper
         uses: actions/upload-artifact@v4
         with:
           name: logs-scraper
           path: scraper_log.txt
 
-      - name: Upload HTML results
+      - name: Upload arquivo HTML fixo do resultado
         uses: actions/upload-artifact@v4
         with:
           name: resultado-busca-aneel
           path: resultado_busca_aneel_teste.html
 
-      - name: Upload JSON results
+      - name: Listar arquivos HTML gerados
+        run: ls -lah resultado_busca_aneel_teste.html || echo "Nenhum arquivo HTML gerado"
+
+      - name: Upload JSON resultados
         uses: actions/upload-artifact@v4
         with:
           name: resultados-json

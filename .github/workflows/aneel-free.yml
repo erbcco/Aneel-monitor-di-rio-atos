@@ -53,7 +53,7 @@ jobs:
           name: resultado-busca-aneel
           path: resultado_busca_aneel_teste.html
 
-      - name: Listar arquivos HTML
+      - name: Listar arquivos HTML gerados
         run: ls -lah resultado_busca_aneel_teste.html || echo "Nenhum arquivo HTML gerado"
 
       - name: Upload dos resultados JSON

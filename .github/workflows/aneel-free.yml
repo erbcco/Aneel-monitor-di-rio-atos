@@ -1,4 +1,4 @@
-name: ANEEL Free Daily Monitor
+name: Monitoramento ANEEL
 
 on:
   schedule:
@@ -9,12 +9,20 @@ permissions:
   contents: write
 
 jobs:
-  monitor-aneel:
+  monitoramento:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout código
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
+
+      - name: Executar monitoramento
+        run: python seu_script.py
+
+      - name: Upload do arquivo HTML
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: arquivos-html
+          path: 'pagina_resultados_*.html'
 
       - name: 🐍 Configurar Python
         uses: actions/setup-python@v4
@@ -43,7 +51,7 @@ jobs:
             git push || echo "Nada para commitar"
           fi
       - name: 📤 Upload resultados como artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: aneel-results-${{ github.run_number }}
           path: resultados_aneel.json

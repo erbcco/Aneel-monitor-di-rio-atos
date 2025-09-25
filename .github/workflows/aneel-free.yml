@@ -2,7 +2,7 @@ name: Monitoramento ANEEL
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'  # Segunda a sexta às 9:00 BRT (12:00 UTC)
+    - cron: '0 12 * * 1-5'
   workflow_dispatch:
 
 permissions:
@@ -11,6 +11,7 @@ permissions:
 jobs:
   monitoramento:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,12 +20,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Instalar dependências gratuitas
+      - name: Instalar dependências com log salvo
+        id: install
         run: |
-          python --version
-          pip --version
-          python -m pip install --upgrade pip -v --no-cache-dir
-          python -m pip install requests beautifulsoup4 lxml pytz -v --no-cache-dir
+          python -m pip install --upgrade pip -v --no-cache-dir > install_log.txt 2>&1
+          python -m pip install requests beautifulsoup4 lxml pytz -v --no-cache-dir >> install_log.txt 2>&1
+        continue-on-error: true
+
+      - name: Salvar log instalação
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-log-${{ github.run_number }}
+          path: install_log.txt
 
       - name: Testar permissão simples
         run: |
@@ -40,12 +48,21 @@ jobs:
           echo "<html><body>Teste simples</body></html>" > teste_gravacao_simples.html
           ls -l
 
-      - name: 🔍 Executar monitoramento ANEEL
+      - name: Executar monitoramento ANEEL com log salvo
+        id: run_scraper
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
-        run: python scraper_aneel_free.py
+        run: python scraper_aneel_free.py > scraper_log.txt 2>&1
+        continue-on-error: true
+
+      - name: Salvar log scraper
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-log-${{ github.run_number }}
+          path: scraper_log.txt
 
       - name: 💾 Salvar resultados no git
         run: |

@@ -10,35 +10,39 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 PALAVRAS_CHAVE = ["Portaria"]
 
 async def buscar_termo(pagina, termo, data_pesquisa):
-    logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
-    await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
-    await pagina.fill('input#ctl00_Conteudo_txtPalavraChave', termo)
-    await pagina.fill('input#ctl00_Conteudo_txtDataInicio', data_pesquisa)
-    await pagina.fill('input#ctl00_Conteudo_txtDataFim', data_pesquisa)
-    await pagina.select_option('select#ctl00_Conteudo_ddlCampoPesquisa', label='Todos os campos')
-    await pagina.select_option('select#ctl00_Conteudo_ddlTipoPesquisa', label='avancada')
-    await pagina.click('input#ctl00_Conteudo_btnPesquisar')
-    await pagina.wait_for_selector('table.k-grid-table')
-    content = await pagina.content()
-    with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
-        f.write(content)
-    rows = await pagina.query_selector_all('table.k-grid-table tr')
-    documentos = []
-    for row in rows[1:]:
-        cols = await row.query_selector_all("td")
-        if len(cols) >= 2:
-            titulo = (await cols[1].inner_text()).strip()
-            linkElem = await cols[1].query_selector("a")
-            url = await linkElem.get_attribute("href") if linkElem else None
-            url_completa = f"https://biblioteca.aneel.gov.br{url}" if url else None
-            documentos.append({"termo": termo, "titulo": titulo, "url": url_completa})
-    logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
-    return documentos
+    try:
+        logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
+        await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
+        await pagina.fill('input#ctl00_Conteudo_txtPalavraChave', termo)
+        await pagina.fill('input#ctl00_Conteudo_txtDataInicio', data_pesquisa)
+        await pagina.fill('input#ctl00_Conteudo_txtDataFim', data_pesquisa)
+        await pagina.select_option('select#ctl00_Conteudo_ddlCampoPesquisa', label='Todos os campos')
+        await pagina.select_option('select#ctl00_Conteudo_ddlTipoPesquisa', label='avancada')
+        await pagina.click('input#ctl00_Conteudo_btnPesquisar')
+        await pagina.wait_for_selector('table.k-grid-table')
+        content = await pagina.content()
+        with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
+            f.write(content)
+        rows = await pagina.query_selector_all('table.k-grid-table tr')
+        documentos = []
+        for row in rows[1:]:
+            cols = await row.query_selector_all("td")
+            if len(cols) >= 2:
+                titulo = (await cols[1].inner_text()).strip()
+                linkElem = await cols[1].query_selector("a")
+                url = await linkElem.get_attribute("href") if linkElem else None
+                url_completa = f"https://biblioteca.aneel.gov.br{url}" if url else None
+                documentos.append({"termo": termo, "titulo": titulo, "url": url_completa})
+        logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
+        return documentos
+    except Exception:
+        logger.error("Erro ao buscar termo:\n" + traceback.format_exc())
+        raise
 
 async def main_async():
     try:
@@ -61,8 +65,7 @@ async def main_async():
         else:
             logger.info("Nenhum documento encontrado, email não será enviado.")
     except Exception:
-        logger.error("Erro crítico no scraper:")
-        logger.error(traceback.format_exc())
+        logger.error("Erro crítico no scraper:\n" + traceback.format_exc())
         raise
 
 def enviar_email(documentos):
@@ -88,8 +91,7 @@ def enviar_email(documentos):
             server.send_message(msg)
         logger.info("Email enviado com sucesso.")
     except Exception:
-        logger.error("Erro ao enviar email:")
-        logger.error(traceback.format_exc())
+        logger.error("Erro ao enviar email:\n" + traceback.format_exc())
 
 def main():
     asyncio.run(main_async())

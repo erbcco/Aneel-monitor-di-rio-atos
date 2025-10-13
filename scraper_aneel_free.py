@@ -5,9 +5,6 @@ from datetime import datetime
 import json
 import logging
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -19,35 +16,24 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
 
-        # Campo principal de busca ("Todos os campos")
-        await pagina.wait_for_selector('input[name="TextoBuscaBooleana1"]', timeout=60000)
-        await pagina.fill('input[name="TextoBuscaBooleana1"]', termo)
-        
-        # Campo de publicação: selecionar "Entre" (se for <select> com id ou name apropriado)
-        await pagina.select_option('select[name="IntervaloPublicacao"], select#IntervaloPublicacao', label='Entre')
-
-        # Datas de publicação -- ajuste name/id pelo seu HTML
-        await pagina.fill('input[name="DataInicioPublicacao"], input#DataInicioPublicacao', data_pesquisa)
-        await pagina.fill('input[name="DataFimPublicacao"], input#DataFimPublicacao', data_pesquisa)
-
-        # Clicar no botão Buscar
-        await pagina.click('button:has-text("Buscar")', timeout=60000)
-
-        await pagina.wait_for_selector('table', timeout=60000)
+        # Salve sempre o HTML após o goto!
         content = await pagina.content()
-        with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
+        with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
 
-        rows = await pagina.query_selector_all('table tr')
+        await pagina.wait_for_selector('input[name="TextoBuscaBooleana1"]', timeout=60000)
+        await pagina.fill('input[name="TextoBuscaBooleana1"]', termo)
+
+        # Não tente selecionar "Entre" até saber o nome do campo.
+        # await pagina.select_option(...)
+
+        # Não tente preencher a data até saber o nome dos campos.
+        # await pagina.fill(...)
+
+        # Não tente clicar ainda.
+        # await pagina.click(...)
+
         documentos = []
-        for row in rows[1:]:
-            cols = await row.query_selector_all("td")
-            if len(cols) >= 2:
-                titulo = (await cols[1].inner_text()).strip()
-                linkElem = await cols[1].query_selector("a")
-                url = await linkElem.get_attribute("href") if linkElem else None
-                url_completa = url if url and url.startswith("http") else f"https://biblioteca.aneel.gov.br{url}" if url else None
-                documentos.append({"termo": termo, "titulo": titulo, "url": url_completa})
         logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
         return documentos
     except Exception:
@@ -71,37 +57,12 @@ async def main_async():
                 "documentos": documentos_totais
             }, f, ensure_ascii=False, indent=2)
         if documentos_totais:
-            enviar_email(documentos_totais)
+            logger.info("Documentos encontrados.")
         else:
-            logger.info("Nenhum documento encontrado, email não será enviado.")
+            logger.info("Nenhum documento encontrado.")
     except Exception:
         logger.error("Erro crítico no scraper:\n" + traceback.format_exc())
         raise
-
-def enviar_email(documentos):
-    try:
-        remetente = os.getenv("GMAIL_USER")
-        senha = os.getenv("GMAIL_APP_PASSWORD")
-        destinatario = os.getenv("EMAIL_DESTINATARIO")
-        if not (remetente and senha and destinatario):
-            logger.error("Variáveis de ambiente para email não configuradas.")
-            return
-        assunto = f"Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-        corpo = "Documentos encontrados:\n\n"
-        for doc in documentos:
-            corpo += f"- {doc['titulo']}: {doc['url']}\n"
-        msg = MIMEMultipart()
-        msg["From"] = remetente
-        msg["To"] = destinatario
-        msg["Subject"] = assunto
-        msg.attach(MIMEText(corpo, "plain"))
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(remetente, senha)
-            server.send_message(msg)
-        logger.info("Email enviado com sucesso.")
-    except Exception:
-        logger.error("Erro ao enviar email:\n" + traceback.format_exc())
 
 def main():
     asyncio.run(main_async())

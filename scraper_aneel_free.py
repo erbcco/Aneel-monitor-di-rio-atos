@@ -18,6 +18,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
     try:
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
+        # Salve para debug sempre que necessário
         content = await pagina.content()
         with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
@@ -25,15 +26,14 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         await pagina.wait_for_selector('input[name="TextoBuscaBooleana1"]', timeout=60000)
         await pagina.fill('input[name="TextoBuscaBooleana1"]', termo)
 
-        # Clique EXPLÍCITO no botão do formulário real:
-        await pagina.click('form button[type="submit"]')
+        # Clique no botão correto (busca avançada)
+        await pagina.click('button:has-text("Buscar")', timeout=60000)
 
         await pagina.wait_for_selector('table, .k-grid-table', timeout=60000)
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)
 
-        # Flexibilize a busca pelas linhas da tabela
         rows = await pagina.query_selector_all('table tr')
         documentos = []
         for row in rows[1:]:

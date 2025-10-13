@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import os
 import logging
+import traceback
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
@@ -14,7 +15,8 @@ logger = logging.getLogger(__name__)
 PALAVRAS_CHAVE = ["Portaria"]
 
 async def buscar_termo(pagina, termo, data_pesquisa):
-    await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada")
+    logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
+    await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
     await pagina.fill('input#ctl00_Conteudo_txtPalavraChave', termo)
     await pagina.fill('input#ctl00_Conteudo_txtDataInicio', data_pesquisa)
     await pagina.fill('input#ctl00_Conteudo_txtDataFim', data_pesquisa)
@@ -39,49 +41,52 @@ async def buscar_termo(pagina, termo, data_pesquisa):
     return documentos
 
 async def main_async():
-    data_pesquisa = datetime.now().strftime("%d/%m/%Y")
-    documentos_totais = []
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        page = await browser.new_page()
-        for termo in PALAVRAS_CHAVE:
-            documentos = await buscar_termo(page, termo, data_pesquisa)
-            documentos_totais.extend(documentos)
-        await browser.close()
-    with open("resultados_aneel.json", "w", encoding="utf-8") as f:
-        json.dump({
-            "data_execucao": datetime.now().isoformat(),
-            "documentos": documentos_totais
-        }, f, ensure_ascii=False, indent=2)
-    if documentos_totais:
-        enviar_email(documentos_totais)
-    else:
-        logger.info("Nenhum documento encontrado. Não enviar e-mail.")
+    try:
+        data_pesquisa = datetime.now().strftime("%d/%m/%Y")
+        documentos_totais = []
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            page = await browser.new_page()
+            for termo in PALAVRAS_CHAVE:
+                documentos = await buscar_termo(page, termo, data_pesquisa)
+                documentos_totais.extend(documentos)
+            await browser.close()
+        with open("resultados_aneel.json", "w", encoding="utf-8") as f:
+            json.dump({"data_execucao": datetime.now().isoformat(), "documentos": documentos_totais}, f, ensure_ascii=False, indent=2)
+        if documentos_totais:
+            enviar_email(documentos_totais)
+        else:
+            logger.info("Nenhum documento encontrado. Não enviar e-mail.")
+    except Exception as e:
+        logger.error("Erro crítico no scraper:")
+        logger.error(traceback.format_exc())
+        raise
 
 def enviar_email(documentos):
-    remetente = os.getenv("GMAIL_USER")
-    senha = os.getenv("GMAIL_APP_PASSWORD")
-    destinatario = os.getenv("EMAIL_DESTINATARIO")
-    if not (remetente and senha and destinatario):
-        logger.error("Variáveis de ambiente para email não configuradas.")
-        return
-    assunto = f"Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-    corpo = "Documentos encontrados:\n\n"
-    for doc in documentos:
-        corpo += f"- {doc['titulo']}: {doc['url']}\n"
-    msg = MIMEMultipart()
-    msg["From"] = remetente
-    msg["To"] = destinatario
-    msg["Subject"] = assunto
-    msg.attach(MIMEText(corpo, "plain"))
     try:
+        remetente = os.getenv("GMAIL_USER")
+        senha = os.getenv("GMAIL_APP_PASSWORD")
+        destinatario = os.getenv("EMAIL_DESTINATARIO")
+        if not (remetente and senha and destinatario):
+            logger.error("Variáveis de ambiente para email não configuradas.")
+            return
+        assunto = f"Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        corpo = "Documentos encontrados:\n\n"
+        for doc in documentos:
+            corpo += f"- {doc['titulo']}: {doc['url']}\n"
+        msg = MIMEMultipart()
+        msg["From"] = remetente
+        msg["To"] = destinatario
+        msg["Subject"] = assunto
+        msg.attach(MIMEText(corpo, "plain"))
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
             server.login(remetente, senha)
             server.send_message(msg)
         logger.info("Email enviado com sucesso.")
     except Exception as e:
-        logger.error(f"Erro ao enviar email: {e}")
+        logger.error("Erro ao enviar email:")
+        logger.error(traceback.format_exc())
 
 def main():
     asyncio.run(main_async())

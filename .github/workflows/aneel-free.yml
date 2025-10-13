@@ -1,74 +1,54 @@
-name: ANEEL Free Daily Monitor
+name: Monitoramento ANEEL Playwright
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'  # Segunda a sexta às 9:00 BRT (12:00 UTC)
-  workflow_dispatch:  # Permite execução manual
+    - cron: '0 12 * * 1-5'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  monitor-aneel:
+  scraper:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: 📥 Checkout código
-      uses: actions/checkout@v4
-      
-    - name: 🐍 Configurar Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: 📦 Instalar dependências gratuitas
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 lxml
-        
-    - name: 🔍 Executar monitoramento ANEEL
-      env:
-        GMAIL_USER: ${{ secrets.GMAIL_USER }}
-        GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
-      run: |
-        python scraper_aneel_free.py
-        
-    - name: 💾 Salvar resultados
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "ANEEL Monitor Bot"
-        
-        if [ -f "resultados_aneel.json" ]; then
-          git add resultados_aneel.json
-          git diff --quiet && git diff --staged --quiet || \
-            git commit -m "📊 Resultados ANEEL $(date +'%Y-%m-%d %H:%M') [skip ci]"
-          git push || echo "Nada para commitar"
-        fi
-        
-    - name: 📤 Upload resultados como artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: aneel-results-${{ github.run_number }}
-        path: resultados_aneel.json
-        retention-days: 30
-      if: always()
-      
-    - name: 📊 Mostrar estatísticas
-      run: |
-        if [ -f "resultados_aneel.json" ]; then
-          echo "📋 Resumo da Execução:"
-          python -c "
-import json
-with open('resultados_aneel.json', 'r', encoding='utf-8') as f:
-    data = json.load(f)
-    stats = data['estatisticas']
-    print(f'✅ Execução concluída em: {stats[\"data_execucao\"]}')
-    print(f'🔍 Termos buscados: {stats[\"total_termos_buscados\"]}')
-    print(f'📄 Documentos encontrados: {stats[\"total_documentos_encontrados\"]}')
-    print(f'🎯 Documentos relevantes: {stats[\"documentos_relevantes\"]}')
-    print('📊 Por categoria:')
-    for cat, num in stats['documentos_por_categoria'].items():
-        print(f'  • {cat}: {num}')
-"
-        fi
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
+          playwright install --with-deps
+
+      - name: Run Scraper
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
+        run: |
+          python scraper_playwright.py > scraper.log 2>&1
+          cat scraper.log
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-scraper
+          path: scraper.log
+
+      - name: Upload resultados JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-json
+          path: resultados_aneel.json
+
+      - name: Upload HTML resultado
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-html
+          path: resultado_Portaria.html

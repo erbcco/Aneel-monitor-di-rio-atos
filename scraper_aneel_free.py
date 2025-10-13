@@ -1,13 +1,13 @@
 import asyncio
+import traceback
 from playwright.async_api import async_playwright
 from datetime import datetime
 import json
 import os
 import logging
-import traceback
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import smtplib
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,12 +52,15 @@ async def main_async():
                 documentos_totais.extend(documentos)
             await browser.close()
         with open("resultados_aneel.json", "w", encoding="utf-8") as f:
-            json.dump({"data_execucao": datetime.now().isoformat(), "documentos": documentos_totais}, f, ensure_ascii=False, indent=2)
+            json.dump({
+                "data_execucao": datetime.now().isoformat(),
+                "documentos": documentos_totais
+            }, f, ensure_ascii=False, indent=2)
         if documentos_totais:
             enviar_email(documentos_totais)
         else:
-            logger.info("Nenhum documento encontrado. Não enviar e-mail.")
-    except Exception as e:
+            logger.info("Nenhum documento encontrado, email não será enviado.")
+    except Exception:
         logger.error("Erro crítico no scraper:")
         logger.error(traceback.format_exc())
         raise
@@ -84,7 +87,7 @@ def enviar_email(documentos):
             server.login(remetente, senha)
             server.send_message(msg)
         logger.info("Email enviado com sucesso.")
-    except Exception as e:
+    except Exception:
         logger.error("Erro ao enviar email:")
         logger.error(traceback.format_exc())
 

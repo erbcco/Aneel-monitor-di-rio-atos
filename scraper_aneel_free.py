@@ -32,9 +32,11 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         await pagina.select_option('select[name="ctl00$Conteudo$ddlTipoPesquisa"]', label='avancada')
         await pagina.click('input#ctl00_Conteudo_btnPesquisar')
         await pagina.wait_for_selector('table.k-grid-table')
+
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)
+
         rows = await pagina.query_selector_all('table.k-grid-table tr')
         documentos = []
         for row in rows[1:]:

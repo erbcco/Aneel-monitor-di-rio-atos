@@ -1,9 +1,9 @@
 import asyncio
 import traceback
 from playwright.async_api import async_playwright
-import logging
 from datetime import datetime
 import json
+import logging
 import os
 import smtplib
 from email.mime.text import MIMEText
@@ -41,7 +41,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
         return documentos
     except Exception:
-        logger.error("Erro na função buscar_termo:\n" + traceback.format_exc())
+        logger.error("Erro ao buscar termo:\n" + traceback.format_exc())
         raise
 
 async def main_async():
@@ -65,7 +65,7 @@ async def main_async():
         else:
             logger.info("Nenhum documento encontrado, email não será enviado.")
     except Exception:
-        logger.error("Erro crítico no main_async:\n" + traceback.format_exc())
+        logger.error("Erro crítico no scraper:\n" + traceback.format_exc())
         raise
 
 def enviar_email(documentos):
@@ -74,27 +74,27 @@ def enviar_email(documentos):
         senha = os.getenv("GMAIL_APP_PASSWORD")
         destinatario = os.getenv("EMAIL_DESTINATARIO")
         if not (remetente and senha and destinatario):
-            logger.error("Variáveis de ambiente para envio de email não configuradas.")
+            logger.error("Variáveis de ambiente para email não configuradas.")
             return
         assunto = f"Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
         corpo = "Documentos encontrados:\n\n"
         for doc in documentos:
             corpo += f"- {doc['titulo']}: {doc['url']}\n"
         msg = MIMEMultipart()
-        msg['From'] = remetente
-        msg['To'] = destinatario
-        msg['Subject'] = assunto
-        msg.attach(MIMEText(corpo, 'plain'))
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+        msg["From"] = remetente
+        msg["To"] = destinatario
+        msg["Subject"] = assunto
+        msg.attach(MIMEText(corpo, "plain"))
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
             server.login(remetente, senha)
             server.send_message(msg)
-        logger.info('Email enviado com sucesso.')
+        logger.info("Email enviado com sucesso.")
     except Exception:
         logger.error("Erro ao enviar email:\n" + traceback.format_exc())
 
 def main():
     asyncio.run(main_async())
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

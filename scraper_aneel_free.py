@@ -20,7 +20,6 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
         await pagina.wait_for_selector('input[name="ctl00$Conteudo$txtPalavraChave"]', timeout=60000)
 
-        # Salvar página para debug
         content = await pagina.content()
         with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)

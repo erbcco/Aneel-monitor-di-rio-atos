@@ -18,20 +18,22 @@ async def buscar_termo(pagina, termo, data_pesquisa):
     try:
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
-        # Campo principal de busca
+
+        # Campo principal de busca ("Todos os campos")
         await pagina.wait_for_selector('input[name="TextoBuscaBooleana1"]', timeout=60000)
         await pagina.fill('input[name="TextoBuscaBooleana1"]', termo)
-
-        # Seleciona "Entre" no campo de Publicação (por name ou id, ajuste se necessário)
-        await pagina.select_option('select[name="IntervaloPublicacao"], select#IntervaloPublicacao', value="Entre")
-        await pagina.fill('input[name="DataInicialPublicacao"], input#DataInicialPublicacao', data_pesquisa)
-        await pagina.fill('input[name="DataFinalPublicacao"], input#DataFinalPublicacao', data_pesquisa)
         
-        # Clique no botão Buscar (busca avançada)
+        # Campo de publicação: selecionar "Entre" (se for <select> com id ou name apropriado)
+        await pagina.select_option('select[name="IntervaloPublicacao"], select#IntervaloPublicacao', label='Entre')
+
+        # Datas de publicação -- ajuste name/id pelo seu HTML
+        await pagina.fill('input[name="DataInicioPublicacao"], input#DataInicioPublicacao', data_pesquisa)
+        await pagina.fill('input[name="DataFimPublicacao"], input#DataFimPublicacao', data_pesquisa)
+
+        # Clicar no botão Buscar
         await pagina.click('button:has-text("Buscar")', timeout=60000)
 
-        # Aguarda tabela de resultados, tenta ambos seletores
-        await pagina.wait_for_selector('table, .k-grid-table', timeout=60000)
+        await pagina.wait_for_selector('table', timeout=60000)
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)

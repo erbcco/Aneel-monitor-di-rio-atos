@@ -18,34 +18,26 @@ async def buscar_termo(pagina, termo, data_pesquisa):
     try:
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
-        await pagina.wait_for_selector('input[name="ctl00$Conteudo$txtPalavraChave"]', timeout=60000)
 
+        # Salve o HTML imediatamente após o goto!
         content = await pagina.content()
         with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
 
-        await pagina.fill('input[name="ctl00$Conteudo$txtPalavraChave"]', termo)
-        await pagina.fill('input[name="ctl00$Conteudo$txtDataInicio"]', data_pesquisa)
-        await pagina.fill('input[name="ctl00$Conteudo$txtDataFim"]', data_pesquisa)
-        await pagina.select_option('select[name="ctl00$Conteudo$ddlCampoPesquisa"]', label='Todos os campos')
-        await pagina.select_option('select[name="ctl00$Conteudo$ddlTipoPesquisa"]', label='avancada')
-        await pagina.click('input#ctl00_Conteudo_btnPesquisar')
-        await pagina.wait_for_selector('table.k-grid-table')
+        # COMENTE as linhas abaixo para garantir que o arquivo é salvo mesmo se não encontrar o campo
+        # await pagina.wait_for_selector('input[name="ctl00$Conteudo$txtPalavraChave"]', timeout=60000)
+        # await pagina.fill('input[name="ctl00$Conteudo$txtPalavraChave"]', termo)
+        # await pagina.fill('input[name="ctl00$Conteudo$txtDataInicio"]', data_pesquisa)
+        # await pagina.fill('input[name="ctl00$Conteudo$txtDataFim"]', data_pesquisa)
+        # await pagina.select_option('select[name="ctl00$Conteudo$ddlCampoPesquisa"]', label='Todos os campos')
+        # await pagina.select_option('select[name="ctl00$Conteudo$ddlTipoPesquisa"]', label='avancada')
+        # await pagina.click('input#ctl00_Conteudo_btnPesquisar')
+        # await pagina.wait_for_selector('table.k-grid-table')
+        # content = await pagina.content()
+        # with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
+        #     f.write(content)
 
-        content = await pagina.content()
-        with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
-            f.write(content)
-
-        rows = await pagina.query_selector_all('table.k-grid-table tr')
         documentos = []
-        for row in rows[1:]:
-            cols = await row.query_selector_all("td")
-            if len(cols) >= 2:
-                titulo = (await cols[1].inner_text()).strip()
-                linkElem = await cols[1].query_selector("a")
-                url = await linkElem.get_attribute("href") if linkElem else None
-                url_completa = f"https://biblioteca.aneel.gov.br{url}" if url else None
-                documentos.append({"termo": termo, "titulo": titulo, "url": url_completa})
         logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
         return documentos
     except Exception:

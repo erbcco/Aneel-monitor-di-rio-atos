@@ -3,8 +3,8 @@ import traceback
 from playwright.async_api import async_playwright
 from datetime import datetime
 import json
-import os
 import logging
+import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart

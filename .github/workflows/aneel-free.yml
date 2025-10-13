@@ -13,42 +13,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install Playwright and dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install playwright
-        playwright install --with-deps
+      - name: Install Playwright and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
+          playwright install --with-deps
 
-    - name: Run Scraper
-      env:
-        GMAIL_USER: ${{ secrets.GMAIL_USER }}
-        GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
-      run: |
-        python scraper_playwright.py > scraper.log 2>&1 || true
-        cat scraper.log
+      - name: Run Scraper
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
+        run: |
+          python scraper_aneel_free.py > scraper.log 2>&1 || true
+          cat scraper.log
 
-    - name: Upload logs
-      uses: actions/upload-artifact@v4
-      with:
-        name: logs-scraper
-        path: scraper.log
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-scraper
+          path: scraper.log
 
-    - name: Upload resultados JSON
-      uses: actions/upload-artifact@v4
-      with:
-        name: resultados-json
-        path: resultados_aneel.json
+      - name: Upload resultados JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-json
+          path: resultados_aneel.json
 
-    - name: Upload HTML resultado
-      uses: actions/upload-artifact@v4
-      with:
-        name: resultado-html
-        path: resultado_Portaria.html
+      - name: Upload HTML resultado
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-html
+          path: resultado_Portaria.html

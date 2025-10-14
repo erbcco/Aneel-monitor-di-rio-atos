@@ -20,6 +20,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
 
+        # Clicar na aba "Legislação"
         await pagina.wait_for_selector('button:has-text("Legislação"), a:has-text("Legislação")', timeout=10000)
         try:
             await pagina.click('button:has-text("Legislação")')
@@ -30,6 +31,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
 
+        # Preencher campo palavra-chave e data
         await pagina.wait_for_selector('input[name="LegislacaoPalavraChave"]', timeout=60000)
         await pagina.fill('input[name="LegislacaoPalavraChave"]', termo)
         logger.info(f"Campo palavra-chave preenchido: {termo}")
@@ -38,28 +40,32 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
         logger.info(f"Filtro de publicação configurado para data: {data_pesquisa}")
 
+        # Aguardar botão buscar e clicar
         await pagina.click('button:has-text("Buscar")', timeout=60000)
         logger.info("Clique no botão Buscar enviado")
 
+        # Tentativa de aguardar a tabela. Caso timeout, salvar página e continuar
         try:
             await pagina.wait_for_selector('table', timeout=60000)
             logger.info("Tabela de resultados encontrada")
         except Exception:
-            logger.warning("Tabela não apareceu no tempo esperado, salvando página para análise")
+            logger.warning("Tabela não apareceu no tempo esperado, salvando página")
             content = await pagina.content()
-            nome_arquivo_erro = f"pagina_sem_resultados_{termo}_{int(time.time())}.html"
-            with open(nome_arquivo_erro, "w", encoding="utf-8") as f:
+            file_name = f"pagina_sem_resultados_{termo}_{int(time.time())}.html"
+            with open(file_name, "w", encoding="utf-8") as f:
                 f.write(content)
-            logger.info(f"Página salva em {nome_arquivo_erro}")
+            logger.info(f"Página salva em {file_name}")
             return []
 
+        # Salvar HTML da tabela de resultados
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)
         logger.info(f"HTML de resultados salvo: resultado_{termo}.html")
 
+        # Ler linhas da tabela de resultados
         rows = await pagina.query_selector_all('table tr')
-        logger.info(f"{len(rows)} linhas na tabela (incluindo cabeçalho)")
+        logger.info(f"{len(rows)} linhas encontradas na tabela (incluindo cabeçalho)")
 
         documentos = []
         for i, row in enumerate(rows[1:], 1):
@@ -67,15 +73,15 @@ async def buscar_termo(pagina, termo, data_pesquisa):
             if len(cols) >= 2:
                 try:
                     titulo = (await cols[1].inner_text()).strip()
-                    linkElem = await cols[1].query_selector("a")
-                    url = await linkElem.get_attribute("href") if linkElem else None
+                    link_elem = await cols[1].query_selector("a")
+                    url = await link_elem.get_attribute("href") if link_elem else None
                     url_completa = url if url and url.startswith("http") else f"https://biblioteca.aneel.gov.br{url}" if url else None
                     documentos.append({"termo": termo, "titulo": titulo, "url": url_completa})
                     logger.info(f"Documento {i}: {titulo[:50]}...")
                 except Exception as e:
-                    logger.error(f"Erro ao processar linha {i}: {e}")
+                    logger.error(f"Erro processando linha {i}: {e}")
 
-        logger.info(f"Total documentos encontrados para '{termo}': {len(documentos)}")
+        logger.info(f"Total de documentos encontrados para '{termo}': {len(documentos)}")
         return documentos
 
     except Exception:
@@ -111,7 +117,7 @@ async def main_async():
         if documentos_totais:
             enviar_email(documentos_totais)
         else:
-            logger.info("Nenhum documento encontrado - email não será enviado")
+            logger.info("Nenhum documento encontrado, email não será enviado")
 
     except Exception:
         logger.error("Erro crítico no scraper:\n" + traceback.format_exc())
@@ -122,8 +128,6 @@ def enviar_email(documentos):
         remetente = os.getenv("GMAIL_USER")
         senha = os.getenv("GMAIL_APP_PASSWORD")
         destinatario = os.getenv("EMAIL_DESTINATARIO")
-
-        logger.info(f"Configuração de email - Remetente: {remetente}, Destinatario: {destinatario}")
 
         if not (remetente and senha and destinatario):
             logger.error("Variáveis de ambiente para email não configuradas.")

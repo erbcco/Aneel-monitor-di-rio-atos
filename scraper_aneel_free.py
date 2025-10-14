@@ -15,28 +15,27 @@ async def buscar_termo(pagina, termo, data_pesquisa):
     try:
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
-        # Salve sempre o HTML IMEDIATAMENTE
+
+        # Salvar HTML de debug IMEDIATAMENTE, antes de qualquer ação!
         content = await pagina.content()
-        with open("pagina_debug_goto.html", "w", encoding="utf-8") as f:
+        with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
 
-        # Agora tente clicar na aba. Se falhar, já existe o debug.
-        try:
-            await pagina.wait_for_selector('button:has-text("Legislação")', timeout=10000)
-            await pagina.click('button:has-text("Legislação")')
-            # Salva HTML após o clique na aba
-            content = await pagina.content()
-            with open("pagina_debug_legislacao.html", "w", encoding="utf-8") as f:
-                f.write(content)
-        except Exception as e:
-            logger.error("Falha ao clicar na aba Legislação: "+str(e))
+        # Daqui pra frente você pode tentar ações, mas se der erro
+        # o arquivo pagina_debug.html já estará nos artifacts!
 
-        # Restante da lógica (preencha tudo usando os seletores identificados, mas salve antes!)
+        # Continue o restante apenas se não houver erro
+        # Se cair aqui, salve outro HTML (opcional)
+        # Exemplo: clique na aba, preencher campos, etc.
+
         documentos = []
         logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
         return documentos
     except Exception:
         logger.error("Erro ao buscar termo:\n" + traceback.format_exc())
+        # Opcional: salve novo estado da página se desejar
+        # with open("pagina_debug_error.html", "w", encoding="utf-8") as f:
+        #     f.write(await pagina.content())
         raise
 
 async def main_async():

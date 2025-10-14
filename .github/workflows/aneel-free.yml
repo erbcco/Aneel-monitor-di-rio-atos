@@ -37,3 +37,5 @@ jobs:
             resultado_Portaria.html
             resultados_aneel.json
             scraper.log
+      - name: Listar arquivos no workspace
+        run: ls -la

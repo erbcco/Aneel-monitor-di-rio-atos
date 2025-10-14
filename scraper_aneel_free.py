@@ -20,38 +20,32 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
 
-        # Clique na aba "Legislação"
         await pagina.wait_for_selector('button:has-text("Legislação"), a:has-text("Legislação")', timeout=10000)
         try:
             await pagina.click('button:has-text("Legislação")')
         except:
             await pagina.click('a:has-text("Legislação")')
 
-        # Salva HTML de debug após ativar a aba
         content = await pagina.content()
         with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
 
-        # Aguarda aparecer campo da aba correta
         await pagina.wait_for_selector('input[name="LegislacaoPalavraChave"]', timeout=60000)
         await pagina.fill('input[name="LegislacaoPalavraChave"]', termo)
-        logger.info(f"Campo palavra-chave preenchido com: {termo}")
+        logger.info(f"Campo palavra-chave preenchido: {termo}")
 
-        # Configurar filtro de publicação para "Igual a"
         await pagina.select_option('select[name="LegislacaoTipoFiltroDataPublicacao"]', label='Igual a')
         await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
         logger.info(f"Filtro de publicação configurado para data: {data_pesquisa}")
 
-        # Clique no botão Buscar
         await pagina.click('button:has-text("Buscar")', timeout=60000)
-        logger.info("Clique no botão Buscar executado")
+        logger.info("Clique no botão Buscar enviado")
 
-        # Espera tabela, trata timeout se não aparecer
         try:
             await pagina.wait_for_selector('table', timeout=60000)
             logger.info("Tabela de resultados encontrada")
         except Exception:
-            logger.warning("Tabela não encontrada após timeout. Salvando página para análise.")
+            logger.warning("Tabela não apareceu no tempo esperado, salvando página para análise")
             content = await pagina.content()
             nome_arquivo_erro = f"pagina_sem_resultados_{termo}_{int(time.time())}.html"
             with open(nome_arquivo_erro, "w", encoding="utf-8") as f:
@@ -59,18 +53,16 @@ async def buscar_termo(pagina, termo, data_pesquisa):
             logger.info(f"Página salva em {nome_arquivo_erro}")
             return []
 
-        # Salvar HTML dos resultados
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)
         logger.info(f"HTML de resultados salvo: resultado_{termo}.html")
 
-        # Processar resultados
         rows = await pagina.query_selector_all('table tr')
-        logger.info(f"Encontradas {len(rows)} linhas na tabela (incluindo cabeçalho)")
+        logger.info(f"{len(rows)} linhas na tabela (incluindo cabeçalho)")
 
         documentos = []
-        for i, row in enumerate(rows[1:], 1):  # Pula cabeçalho
+        for i, row in enumerate(rows[1:], 1):
             cols = await row.query_selector_all("td")
             if len(cols) >= 2:
                 try:
@@ -83,7 +75,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
                 except Exception as e:
                     logger.error(f"Erro ao processar linha {i}: {e}")
 
-        logger.info(f"Total de {len(documentos)} documentos encontrados para termo '{termo}'")
+        logger.info(f"Total documentos encontrados para '{termo}': {len(documentos)}")
         return documentos
 
     except Exception:
@@ -96,8 +88,6 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         except:
             pass
         raise
-
-# Funções main e envio de email permanecem as mesmas, sem alterações.
 
 async def main_async():
     try:
@@ -128,8 +118,37 @@ async def main_async():
         raise
 
 def enviar_email(documentos):
-    # Função de envio de email como já implementada antes
-    pass
+    try:
+        remetente = os.getenv("GMAIL_USER")
+        senha = os.getenv("GMAIL_APP_PASSWORD")
+        destinatario = os.getenv("EMAIL_DESTINATARIO")
+
+        logger.info(f"Configuração de email - Remetente: {remetente}, Destinatario: {destinatario}")
+
+        if not (remetente and senha and destinatario):
+            logger.error("Variáveis de ambiente para email não configuradas.")
+            return
+
+        assunto = f"Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        corpo = f"Foram encontrados {len(documentos)} documentos:\n\n"
+        for doc in documentos:
+            corpo += f"- {doc['titulo']}: {doc['url']}\n"
+
+        msg = MIMEMultipart()
+        msg["From"] = remetente
+        msg["To"] = destinatario
+        msg["Subject"] = assunto
+        msg.attach(MIMEText(corpo, "plain"))
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(remetente, senha)
+            server.send_message(msg)
+
+        logger.info("Email enviado com sucesso!")
+    except Exception:
+        logger.error("Erro ao enviar email:")
+        logger.error(traceback.format_exc())
 
 def main():
     asyncio.run(main_async())

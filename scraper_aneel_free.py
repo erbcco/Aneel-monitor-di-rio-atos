@@ -13,6 +13,13 @@ from email.mime.multipart import MIMEMultipart
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
+# Adiciona FileHandler para gravar log em arquivo scraper.log
+file_handler = logging.FileHandler("scraper.log", encoding="utf-8")
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
 PALAVRAS_CHAVE = ["Portaria"]
 
 async def buscar_termo(pagina, termo, data_pesquisa):
@@ -36,11 +43,11 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
         logger.info(f"Campos preenchidos - palavra-chave: {termo}, data: {data_pesquisa}")
 
-        await asyncio.sleep(2)  # espera para a interface processar
+        await asyncio.sleep(2)
 
         await pagina.click('button:has-text("Buscar")')
         await pagina.wait_for_load_state('networkidle')
-        await asyncio.sleep(3)  # espera extra para carregar resultados
+        await asyncio.sleep(3)
         logger.info("Busca enviada e página de resultados carregada")
 
         try:
@@ -64,7 +71,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"Linhas na tabela (incluindo cabeçalho): {len(rows)}")
 
         documentos = []
-        for i, row in enumerate(rows[1:], 1):  # pula cabeçalho
+        for i, row in enumerate(rows[1:], 1):
             cols = await row.query_selector_all("td")
             if len(cols) >= 2:
                 try:
@@ -77,7 +84,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
                 except Exception as e:
                     logger.error(f"Erro processando linha {i}: {e}")
 
-        logger.info(f"Total de documentos encontrados para '{termo}': {len(documentos)}")
+        logger.info(f"Total documentos encontrados para '{termo}': {len(documentos)}")
         return documentos
 
     except Exception:

@@ -26,7 +26,6 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         except:
             await pagina.click('a:has-text("Legislação")')
 
-        # Salvar debug da página aberta
         content = await pagina.content()
         with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
@@ -37,12 +36,11 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
         logger.info(f"Campos preenchidos - palavra-chave: {termo}, data: {data_pesquisa}")
 
-        await asyncio.sleep(2)  # pequena espera para o navegador processar
+        await asyncio.sleep(2)  # espera para a interface processar
 
-        # Clicar no botão Buscar e aguardar carregamento completo da página
         await pagina.click('button:has-text("Buscar")')
         await pagina.wait_for_load_state('networkidle')
-        await asyncio.sleep(3)
+        await asyncio.sleep(3)  # espera extra para carregar resultados
         logger.info("Busca enviada e página de resultados carregada")
 
         try:
@@ -63,10 +61,10 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"HTML de resultados salvo: resultado_{termo}.html")
 
         rows = await pagina.query_selector_all('table tr')
-        logger.info(f"{len(rows)} linhas na tabela (incluindo cabeçalho)")
+        logger.info(f"Linhas na tabela (incluindo cabeçalho): {len(rows)}")
 
         documentos = []
-        for i, row in enumerate(rows[1:], 1):
+        for i, row in enumerate(rows[1:], 1):  # pula cabeçalho
             cols = await row.query_selector_all("td")
             if len(cols) >= 2:
                 try:
@@ -79,7 +77,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
                 except Exception as e:
                     logger.error(f"Erro processando linha {i}: {e}")
 
-        logger.info(f"Total documentos encontrados para '{termo}': {len(documentos)}")
+        logger.info(f"Total de documentos encontrados para '{termo}': {len(documentos)}")
         return documentos
 
     except Exception:

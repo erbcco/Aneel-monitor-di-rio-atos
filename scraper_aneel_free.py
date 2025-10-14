@@ -20,52 +20,53 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
 
-        # Clicar na aba "Legislação"
         await pagina.wait_for_selector('button:has-text("Legislação"), a:has-text("Legislação")', timeout=10000)
         try:
             await pagina.click('button:has-text("Legislação")')
         except:
             await pagina.click('a:has-text("Legislação")')
 
+        # Salvar debug da página aberta
         content = await pagina.content()
         with open("pagina_debug.html", "w", encoding="utf-8") as f:
             f.write(content)
 
-        # Preencher campo palavra-chave e data
         await pagina.wait_for_selector('input[name="LegislacaoPalavraChave"]', timeout=60000)
         await pagina.fill('input[name="LegislacaoPalavraChave"]', termo)
-        logger.info(f"Campo palavra-chave preenchido: {termo}")
-
         await pagina.select_option('select[name="LegislacaoTipoFiltroDataPublicacao"]', label='Igual a')
         await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
-        logger.info(f"Filtro de publicação configurado para data: {data_pesquisa}")
+        logger.info(f"Campos preenchidos - palavra-chave: {termo}, data: {data_pesquisa}")
 
-        # Aguardar botão buscar e clicar
-        await pagina.click('button:has-text("Buscar")', timeout=60000)
-        logger.info("Clique no botão Buscar enviado")
+        # Delay para garantir processamento da UI
+        await asyncio.sleep(2)
 
-        # Tentativa de aguardar a tabela. Caso timeout, salvar página e continuar
+        # Clicar no botão Buscar e aguardar carregamento completo da página
+        await pagina.click('button:has-text("Buscar")')
+        await pagina.wait_for_load_state('networkidle')
+        await asyncio.sleep(3)  # espera extra para estabilidade da página
+        logger.info("Busca enviada e página de resultados carregada")
+
+        # Verificar existência da tabela de resultados
         try:
             await pagina.wait_for_selector('table', timeout=60000)
             logger.info("Tabela de resultados encontrada")
         except Exception:
-            logger.warning("Tabela não apareceu no tempo esperado, salvando página")
+            logger.warning("Tabela não encontrada após timeout. Salvando página para análise.")
             content = await pagina.content()
-            file_name = f"pagina_sem_resultados_{termo}_{int(time.time())}.html"
-            with open(file_name, "w", encoding="utf-8") as f:
+            nome_arquivo_erro = f"pagina_sem_resultados_{termo}_{int(time.time())}.html"
+            with open(nome_arquivo_erro, "w", encoding="utf-8") as f:
                 f.write(content)
-            logger.info(f"Página salva em {file_name}")
+            logger.info(f"Página salva em {nome_arquivo_erro}")
             return []
 
-        # Salvar HTML da tabela de resultados
+        # Salvar página de resultados
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)
         logger.info(f"HTML de resultados salvo: resultado_{termo}.html")
 
-        # Ler linhas da tabela de resultados
         rows = await pagina.query_selector_all('table tr')
-        logger.info(f"{len(rows)} linhas encontradas na tabela (incluindo cabeçalho)")
+        logger.info(f"{len(rows)} linhas na tabela (incluindo cabeçalho)")
 
         documentos = []
         for i, row in enumerate(rows[1:], 1):
@@ -81,7 +82,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
                 except Exception as e:
                     logger.error(f"Erro processando linha {i}: {e}")
 
-        logger.info(f"Total de documentos encontrados para '{termo}': {len(documentos)}")
+        logger.info(f"Total documentos encontrados para '{termo}': {len(documentos)}")
         return documentos
 
     except Exception:

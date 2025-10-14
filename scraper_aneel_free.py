@@ -3,60 +3,54 @@ import traceback
 from playwright.async_api import async_playwright
 from datetime import datetime
 import json
-import logging
-import os
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
-
-PALAVRAS_CHAVE = ["Portaria"]
 
 async def buscar_termo(pagina, termo, data_pesquisa):
     try:
-        logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
 
-        # Salvar HTML de debug IMEDIATAMENTE, antes de qualquer ação!
+        # Salve debug da tela inicial (Acervo)
         content = await pagina.content()
-        with open("pagina_debug.html", "w", encoding="utf-8") as f:
+        with open("pagina_debug_inicial.html", "w", encoding="utf-8") as f:
             f.write(content)
 
-        # Daqui pra frente você pode tentar ações, mas se der erro
-        # o arquivo pagina_debug.html já estará nos artifacts!
+        # Clique na aba Legislação
+        await pagina.wait_for_selector('button:has-text("Legislação")', timeout=10000)
+        await pagina.click('button:has-text("Legislação")')
 
-        # Continue o restante apenas se não houver erro
-        # Se cair aqui, salve outro HTML (opcional)
-        # Exemplo: clique na aba, preencher campos, etc.
+        # Salve debug após Legislação estar ativa
+        content = await pagina.content()
+        with open("pagina_debug_legislacao.html", "w", encoding="utf-8") as f:
+            f.write(content)
 
-        documentos = []
-        logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
-        return documentos
+        # Preencha campos SÓ após Legislação estar ativa
+        await pagina.wait_for_selector('input[name="LegislacaoPalavraChave"]', timeout=60000)
+        await pagina.fill('input[name="LegislacaoPalavraChave"]', termo)
+
+        await pagina.select_option('select[name="LegislacaoTipoFiltroDataPublicacao"]', label='Entre')
+        await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
+        await pagina.fill('input[name="LegislacaoDataPublicacao2"]', data_pesquisa)
+
+        # Clique em Buscar
+        await pagina.click('button:has-text("Buscar")', timeout=60000)
+
+        await pagina.wait_for_selector('table', timeout=60000)
+        content = await pagina.content()
+        with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # Continue processamento conforme resultado exibido
     except Exception:
-        logger.error("Erro ao buscar termo:\n" + traceback.format_exc())
-        # Opcional: salve novo estado da página se desejar
-        # with open("pagina_debug_error.html", "w", encoding="utf-8") as f:
-        #     f.write(await pagina.content())
+        with open("pagina_debug_error.html", "w", encoding="utf-8") as f:
+            f.write(await pagina.content())
         raise
 
 async def main_async():
-    try:
-        data_pesquisa = datetime.now().strftime("%d/%m/%Y")
-        documentos_totais = []
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
-            page = await browser.new_page()
-            for termo in PALAVRAS_CHAVE:
-                documentos = await buscar_termo(page, termo, data_pesquisa)
-                documentos_totais.extend(documentos)
-            await browser.close()
-        with open("resultados_aneel.json", "w", encoding="utf-8") as f:
-            json.dump({
-                "data_execucao": datetime.now().isoformat(),
-                "documentos": documentos_totais
-            }, f, ensure_ascii=False, indent=2)
-    except Exception:
-        logger.error("Erro crítico no scraper:\n" + traceback.format_exc())
-        raise
+    data_pesquisa = datetime.now().strftime("%d/%m/%Y")
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await buscar_termo(page, "Portaria", data_pesquisa)
+        await browser.close()
 
 def main():
     asyncio.run(main_async())

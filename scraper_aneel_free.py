@@ -16,30 +16,20 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
 
-        # Clique na aba "Legislação"
-        await pagina.wait_for_selector('button:has-text("Legislação"), a:has-text("Legislação")', timeout=10000)
-        try:
-            await pagina.click('button:has-text("Legislação")')
-        except:
-            await pagina.click('a:has-text("Legislação")')
+        # Clique na aba 'Legislação' se ela não estiver ativa
+        await pagina.wait_for_selector('button:has-text("Legislação")', timeout=10000)
+        await pagina.click('button:has-text("Legislação")')
 
-        # Salva HTML de debug após ativar a aba
-        content = await pagina.content()
-        with open("pagina_debug.html", "w", encoding="utf-8") as f:
-            f.write(content)
+        # Aguarde o campo correto aparecer na aba de legislação
+        await pagina.wait_for_selector('input[name="LegislacaoPalavraChave"]', timeout=60000)
+        await pagina.fill('input[name="LegislacaoPalavraChave"]', termo)
 
-        # Aguarda aparecer campo da aba correta!
-        await pagina.wait_for_selector('input[name="TextoBuscaBooleana1"]', timeout=60000)
-        await pagina.fill('input[name="TextoBuscaBooleana1"]', termo)
+        # Público alvo: selecionar "Entre" no filtro de publicação e preencher datas
+        await pagina.select_option('select[name="LegislacaoTipoFiltroDataPublicacao"]', label='Entre')
+        await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
+        await pagina.fill('input[name="LegislacaoDataPublicacao2"]', data_pesquisa)
 
-        # (Os próximos campos dependem do seu HTML final para "Legislação",
-        # portanto, pode ser necessário salvar/apurar o nome real dos campos do filtro publicação)
-        # Exemplo genérico:
-        # await pagina.select_option('select[name="PublicacaoInterval"], select#PublicacaoInterval', label='Entre')
-        # await pagina.fill('input[name="DataInicioPublicacao"], input#DataInicioPublicacao', data_pesquisa)
-        # await pagina.fill('input[name="DataFimPublicacao"], input#DataFimPublicacao', data_pesquisa)
-
-        # Clique no botão Buscar correto da Legislação
+        # Clique no botão Buscar correto da aba Legislação
         await pagina.click('button:has-text("Buscar")', timeout=60000)
 
         await pagina.wait_for_selector('table', timeout=60000)

@@ -18,61 +18,53 @@ async def buscar_termo(pagina, termo, data_pesquisa):
     try:
         logger.info(f"Buscando termo: {termo} para data {data_pesquisa}")
         
-        # Navegar para a página
         await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
         
-        # FORÇAR salvamento do HTML IMEDIATAMENTE - primeira linha após goto
-        try:
-            content = await pagina.content()
-            with open("pagina_debug.html", "w", encoding="utf-8") as f:
-                f.write(content)
-            logger.info("HTML de debug salvo com sucesso")
-        except Exception as e:
-            logger.error(f"Erro ao salvar HTML de debug: {e}")
+        # Salvar debug inicial
+        content = await pagina.content()
+        with open("pagina_debug.html", "w", encoding="utf-8") as f:
+            f.write(content)
+        logger.info("HTML de debug inicial salvo")
         
-        # Tentar clicar na aba Legislação
+        # Clicar na aba "Legislação" - usar o seletor correto baseado no HTML
         try:
-            # Aguardar botão Legislação aparecer
             await pagina.wait_for_selector('button:has-text("Legislação")', timeout=10000)
             await pagina.click('button:has-text("Legislação")')
             logger.info("Clicou na aba Legislação")
+            
+            # Aguardar um pouco para a aba carregar completamente
+            await asyncio.sleep(1)
         except Exception as e:
             logger.error(f"Erro ao clicar na aba Legislação: {e}")
-            # Tentar alternativas
-            try:
-                await pagina.click('a:has-text("Legislação")')
-                logger.info("Clicou na aba Legislação (link)")
-            except:
-                logger.error("Falhou ao clicar na aba Legislação")
+            return []
         
-        # Salvar HTML após tentar clicar na aba
-        try:
-            content = await pagina.content()
-            with open("pagina_debug_pos_click.html", "w", encoding="utf-8") as f:
-                f.write(content)
-            logger.info("HTML pós-click salvo")
-        except Exception as e:
-            logger.error(f"Erro ao salvar HTML pós-click: {e}")
+        # Salvar debug após clicar na aba
+        content = await pagina.content()
+        with open("pagina_debug_pos_click.html", "w", encoding="utf-8") as f:
+            f.write(content)
+        logger.info("HTML pós-click salvo")
         
-        # Tentar preencher campos da aba Legislação
+        # Preencher o campo "Todos os campos" da Legislação
         try:
             await pagina.wait_for_selector('input[name="LegislacaoPalavraChave"]', timeout=15000)
             await pagina.fill('input[name="LegislacaoPalavraChave"]', termo)
             logger.info(f"Preencheu palavra-chave: {termo}")
             
-            await pagina.select_option('select[name="LegislacaoTipoFiltroDataPublicacao"]', label='Entre')
-            logger.info("Selecionou 'Entre' para publicação")
+            # Configurar filtro de publicação para "Igual a" (que já é o padrão)
+            await pagina.select_option('select[name="LegislacaoTipoFiltroDataPublicacao"]', label='Igual a')
+            logger.info("Selecionou 'Igual a' para publicação")
             
+            # Preencher apenas a data de publicação (campo 1, já que é "Igual a")
             await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
-            await pagina.fill('input[name="LegislacaoDataPublicacao2"]', data_pesquisa)
-            logger.info(f"Preencheu datas: {data_pesquisa}")
+            logger.info(f"Preencheu data de publicação: {data_pesquisa}")
             
-            # Clicar em buscar
-            await pagina.click('button:has-text("Buscar")', timeout=10000)
+            # Clicar no botão Buscar
+            await pagina.click('button[type="submit"]:has-text("Buscar")', timeout=10000)
             logger.info("Clicou em Buscar")
             
             # Aguardar resultados
             await pagina.wait_for_selector('table', timeout=30000)
+            logger.info("Tabela de resultados carregada")
             
             # Salvar página de resultados
             content = await pagina.content()
@@ -82,14 +74,23 @@ async def buscar_termo(pagina, termo, data_pesquisa):
             # Processar resultados
             rows = await pagina.query_selector_all('table tr')
             documentos = []
-            for row in rows[1:]:
+            
+            for row in rows[1:]:  # Pular cabeçalho
                 cols = await row.query_selector_all("td")
                 if len(cols) >= 2:
-                    titulo = (await cols[1].inner_text()).strip()
-                    linkElem = await cols[1].query_selector("a")
-                    url = await linkElem.get_attribute("href") if linkElem else None
-                    url_completa = url if url and url.startswith("http") else f"https://biblioteca.aneel.gov.br{url}" if url else None
-                    documentos.append({"termo": termo, "titulo": titulo, "url": url_completa})
+                    try:
+                        titulo = (await cols[1].inner_text()).strip()
+                        linkElem = await cols[1].query_selector("a")
+                        url = await linkElem.get_attribute("href") if linkElem else None
+                        if url and not url.startswith("http"):
+                            url = f"https://biblioteca.aneel.gov.br{url}"
+                        documentos.append({
+                            "termo": termo, 
+                            "titulo": titulo, 
+                            "url": url
+                        })
+                    except Exception as e:
+                        logger.error(f"Erro ao processar linha da tabela: {e}")
             
             logger.info(f"{len(documentos)} documentos encontrados para termo {termo}")
             return documentos
@@ -97,7 +98,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         except Exception as e:
             logger.error(f"Erro ao preencher campos ou buscar: {e}")
             return []
-
+        
     except Exception as e:
         logger.error("Erro geral no buscar_termo:")
         logger.error(traceback.format_exc())

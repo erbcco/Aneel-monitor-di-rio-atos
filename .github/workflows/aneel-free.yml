@@ -27,7 +27,7 @@ jobs:
       - name: Executar scraper
         run: python scraper_aneel_free.py
 
-      - name: Upload arquivos de debug e resultados
+      - name: Upload arquivos de debug, resultados e logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -36,3 +36,4 @@ jobs:
             pagina_debug.html
             resultado_Portaria.html
             resultados_aneel.json
+            scraper_log.txt

@@ -36,4 +36,4 @@ jobs:
             pagina_debug.html
             resultado_Portaria.html
             resultados_aneel.json
-            scraper_log.txt
+            scraper.log

@@ -37,16 +37,14 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         await pagina.fill('input[name="LegislacaoDataPublicacao1"]', data_pesquisa)
         logger.info(f"Campos preenchidos - palavra-chave: {termo}, data: {data_pesquisa}")
 
-        # Delay para garantir processamento da UI
-        await asyncio.sleep(2)
+        await asyncio.sleep(2)  # pequena espera para o navegador processar
 
         # Clicar no botão Buscar e aguardar carregamento completo da página
         await pagina.click('button:has-text("Buscar")')
         await pagina.wait_for_load_state('networkidle')
-        await asyncio.sleep(3)  # espera extra para estabilidade da página
+        await asyncio.sleep(3)
         logger.info("Busca enviada e página de resultados carregada")
 
-        # Verificar existência da tabela de resultados
         try:
             await pagina.wait_for_selector('table', timeout=60000)
             logger.info("Tabela de resultados encontrada")
@@ -59,7 +57,6 @@ async def buscar_termo(pagina, termo, data_pesquisa):
             logger.info(f"Página salva em {nome_arquivo_erro}")
             return []
 
-        # Salvar página de resultados
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)

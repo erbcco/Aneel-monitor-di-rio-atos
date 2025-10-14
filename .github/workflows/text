@@ -1,0 +1,11 @@
+- name: Upload arquivos de debug
+  uses: actions/upload-artifact@v4
+  if: always()  # Sempre fazer upload, mesmo se houver erro
+  with:
+    name: debug-files
+    path: |
+      pagina_debug.html
+      pagina_debug_pos_click.html
+      pagina_debug_erro.html
+      resultado_*.html
+      resultados_aneel.json

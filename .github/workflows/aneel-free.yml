@@ -8,6 +8,8 @@ on:
 jobs:
   monitoramento:
     runs-on: ubuntu-latest
+    
+    # BLOCO ENV ADICIONADO - Mapeia GitHub Secrets para variáveis de ambiente
     env:
       GMAIL_USER: ${{ secrets.GMAIL_USER }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
@@ -22,7 +24,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Instalar libs do Playwright
+      - name: Instalar libs do sistema
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -38,7 +40,7 @@ jobs:
       - name: Executar scraper ANEEL
         run: python scraper_aneel_free.py
 
-      - name: Exibir arquivos gerados
+      - name: Listar arquivos gerados
         run: ls -lh
 
       - name: Upload artefatos

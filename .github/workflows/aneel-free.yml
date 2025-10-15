@@ -2,23 +2,27 @@ name: Monitoramento ANEEL Diário
 
 on:
   schedule:
-    - cron: '0 11 * * *'  # Executa diariamente às 8h do horário de Brasília (UTC-3)
+    - cron: '0 11 * * *' # 8h BRT (UTC-3)
   workflow_dispatch:
 
 jobs:
   monitoramento:
     runs-on: ubuntu-latest
+    env:
+      GMAIL_USER: ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
 
     steps:
       - name: Checkout repositório
         uses: actions/checkout@v4
 
-      - name: Configurar Python 3.10
+      - name: Setup Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Instalar dependências necessárias do sistema
+      - name: Instalar libs do Playwright
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -37,7 +41,7 @@ jobs:
       - name: Exibir arquivos gerados
         run: ls -lh
 
-      - name: Upload de arquivos de log e debug
+      - name: Upload artefatos
         uses: actions/upload-artifact@v4
         if: always()
         with:

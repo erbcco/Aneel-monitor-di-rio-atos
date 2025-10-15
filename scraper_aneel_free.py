@@ -28,13 +28,19 @@ def extrair_documentos_detalhados(content):
     Extrai documentos com informações detalhadas: ementa, datas, links
     """
     documentos = []
+    logger.info("Iniciando extração de documentos detalhados")
     
-    # Divide o conteúdo em blocos de documentos
-    # Cada bloco começa com "Legislação" e vai até o próximo "Legislação" ou fim
-    blocos = re.split(r'\n\s*Legislação\s*\n', content)
+    # Remove quebras de linha e espaços excessivos para facilitar parsing
+    content_limpo = re.sub(r'\s+', ' ', content)
     
-    for i, bloco in enumerate(blocos[1:], 1):  # Pula o primeiro bloco (cabeçalho)
+    # Procura por padrões de documentos
+    # Cada documento tem: Legislação ... Assinatura: ... Publicação: ... Texto Integral: ...
+    padrao_documento = r'Legislação\s+Esfera:[^Legislação]*?Texto Integral:\s*(https://[^\s]+)'
+    matches = re.finditer(padrao_documento, content_limpo, re.DOTALL)
+    
+    for i, match in enumerate(matches, 1):
         try:
+            bloco = match.group(0)
             documento = {}
             
             # Extrai data de assinatura
@@ -48,54 +54,44 @@ def extrair_documentos_detalhados(content):
                 documento['data_publicacao'] = match_publicacao.group(1)
             
             # Extrai link do texto integral
-            match_texto = re.search(r'Texto Integral:\s*(https://[^\s\n]+)', bloco)
-            if match_texto:
-                documento['link_texto_integral'] = match_texto.group(1)
+            documento['link_texto_integral'] = match.group(1)
             
-            # Extrai link da nota técnica (se houver)
-            match_nota = re.search(r'Nota Técnica[^:]*:\s*(https://[^\s\n]+)', bloco)
-            if match_nota:
-                documento['link_nota_tecnica'] = match_nota.group(1)
+            # Extrai número do documento do link
+            match_numero = re.search(r'/([^/]+)\.pdf$', documento['link_texto_integral'])
+            if match_numero:
+                documento['numero_documento'] = match_numero.group(1)
             
-            # Extrai ementa/assunto
-            # Procura por texto descritivo que não seja metadata
-            linhas = bloco.split('\n')
-            ementa_candidatos = []
-            
-            for linha in linhas:
-                linha = linha.strip()
-                # Pula linhas de metadata
-                if any(palavra in linha for palavra in ['Esfera:', 'Situação:', 'Assinatura:', 'Publicação:', 'Texto Integral:', 'Nota Técnica', 'Assunto:']):
-                    continue
-                # Se a linha tem um bom tamanho e parece descritiva
-                if len(linha) > 30 and any(verbo in linha.lower() for verbo in ['libera', 'aprova', 'autoriza', 'estabelece', 'define', 'regulamenta', 'determina', 'institui']):
-                    ementa_candidatos.append(linha)
-            
-            # Pega a melhor ementa (mais longa e descritiva)
-            if ementa_candidatos:
-                documento['ementa'] = max(ementa_candidatos, key=len)
+            # Extrai ementa (texto entre Publicação e Assunto)
+            match_ementa = re.search(r'Publicação:\s*\d{2}/\d{2}/\d{4}\s+(.*?)\s+Assunto:', bloco)
+            if match_ementa:
+                ementa = match_ementa.group(1).strip()
+                # Limpa a ementa
+                ementa = re.sub(r'\s+', ' ', ementa)
+                ementa = unescape(ementa)
+                documento['ementa'] = ementa
             else:
-                # Se não encontrou ementa descritiva, procura por "Assunto:"
-                match_assunto = re.search(r'Assunto:\s*([^\n]+)', bloco)
-                if match_assunto:
-                    documento['ementa'] = f"Assunto: {match_assunto.group(1)}"
-                else:
-                    documento['ementa'] = "Ementa não disponível"
+                documento['ementa'] = "Ementa não disponível"
             
-            # Extrai número do documento do link (se possível)
-            if 'link_texto_integral' in documento:
-                match_numero = re.search(r'/([^/]+)\.pdf$', documento['link_texto_integral'])
-                if match_numero:
-                    documento['numero_documento'] = match_numero.group(1)
+            # Extrai assunto
+            match_assunto = re.search(r'Assunto:\s*([^Texto]+)', bloco)
+            if match_assunto:
+                documento['assunto'] = match_assunto.group(1).strip()
             
-            # Só adiciona se tem pelo menos o link
-            if 'link_texto_integral' in documento:
-                documentos.append(documento)
-                
+            # Procura por nota técnica no conteúdo completo ao redor do documento
+            padrao_nota = rf'({re.escape(documento["link_texto_integral"])}.*?)(Nota Técnica[^:]*:\s*(https://[^\s]+))'
+            match_nota = re.search(padrao_nota, content_limpo)
+            if match_nota:
+                documento['link_nota_tecnica'] = match_nota.group(3)
+            
+            documento['termo_busca'] = 'Portaria'
+            documentos.append(documento)
+            logger.info(f"Documento {i} extraído: {documento.get('numero_documento', 'sem_numero')}")
+            
         except Exception as e:
-            logger.warning(f"Erro ao processar bloco {i}: {e}")
+            logger.error(f"Erro ao processar documento {i}: {e}")
             continue
     
+    logger.info(f"Total de documentos extraídos: {len(documentos)}")
     return documentos
 
 async def buscar_termo(pagina, termo, data_pesquisa):
@@ -145,10 +141,8 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         content = await pagina.content()
         with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
             f.write(content)
+        logger.info("Página de resultados salva")
 
-        # Extrai informações dos resultados
-        documentos = []
-        
         # Procura por "X registros encontrados"
         registros_match = re.search(r'(\d+)\s*registros encontrados', content)
         if registros_match:
@@ -156,24 +150,19 @@ async def buscar_termo(pagina, termo, data_pesquisa):
             logger.info(f"Encontrados {total_registros} registros na busca")
         else:
             total_registros = 0
+            logger.warning("Não foi possível determinar o número de registros")
 
         if total_registros == 0:
             if "Nenhum registro encontrado" in content:
                 logger.info("Nenhum registro encontrado para a busca")
-            return documentos
+            return []
 
         # Extrai documentos detalhados
         documentos = extrair_documentos_detalhados(content)
         
         # Enriquece cada documento com informações adicionais
         for doc in documentos:
-            doc['termo_busca'] = termo
             doc['data_busca'] = data_pesquisa
-            # Limpa e formata a ementa
-            if 'ementa' in doc:
-                doc['ementa'] = unescape(doc['ementa']).strip()
-                # Remove tags HTML residuais
-                doc['ementa'] = re.sub(r'<[^>]+>', '', doc['ementa'])
 
         logger.info(f"Total de documentos processados: {len(documentos)}")
         return documentos
@@ -244,6 +233,10 @@ def enviar_email(documentos):
             if 'ementa' in doc and doc['ementa']:
                 corpo += f"📝 EMENTA:\n   {doc['ementa']}\n\n"
             
+            # Assunto
+            if 'assunto' in doc and doc['assunto']:
+                corpo += f"🏷️  ASSUNTO: {doc['assunto']}\n"
+            
             # Datas
             if 'data_assinatura' in doc:
                 corpo += f"✍️  DATA DE ASSINATURA: {doc['data_assinatura']}\n"
@@ -258,13 +251,13 @@ def enviar_email(documentos):
             
             # Identificação do documento
             if 'numero_documento' in doc:
-                corpo += f"🆔 NÚMERO DO DOCUMENTO: {doc['numero_documento']}\n"
+                corpo += f"🆔 NÚMERO: {doc['numero_documento']}\n"
             
             corpo += f"\n{'═' * 60}\n\n"
 
         # Rodapé
         corpo += f"🤖 Este e-mail foi gerado automaticamente pelo sistema de monitoramento ANEEL.\n"
-        corpo += f"⏰ Data/hora de execução: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}\n"
+        corpo += f"⏰ Data/hora: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}\n"
 
         msg = MIMEMultipart()
         msg["From"] = remetente

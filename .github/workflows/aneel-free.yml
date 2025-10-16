@@ -2,14 +2,13 @@ name: Monitoramento ANEEL Diário
 
 on:
   schedule:
-    - cron: '0 11 * * *' # 8h BRT (UTC-3)
+    - cron: '0 11 * * *'  # 8h BRT (UTC-3)
   workflow_dispatch:
 
 jobs:
   monitoramento:
     runs-on: ubuntu-latest
     
-    # BLOCO ENV ADICIONADO - Mapeia GitHub Secrets para variáveis de ambiente
     env:
       GMAIL_USER: ${{ secrets.GMAIL_USER }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}

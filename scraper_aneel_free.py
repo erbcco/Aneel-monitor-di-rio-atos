@@ -1,6 +1,5 @@
 import asyncio
 import traceback
-import time
 from playwright.async_api import async_playwright
 from datetime import datetime
 import json
@@ -11,6 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import re
 from html import unescape
+from bs4 import BeautifulSoup
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -25,73 +25,95 @@ PALAVRAS_CHAVE = ["Portaria"]
 
 def extrair_documentos_detalhados(content):
     """
-    Extrai documentos com informações detalhadas: ementa, datas, links
+    Extrai documentos com informações detalhadas usando BeautifulSoup
     """
     documentos = []
     logger.info("Iniciando extração de documentos detalhados")
     
-    # Remove quebras de linha e espaços excessivos para facilitar parsing
-    content_limpo = re.sub(r'\s+', ' ', content)
-    
-    # Procura por padrões de documentos (considera possíveis tags HTML)
-    padrao_documento = r'(?:<\/*(?:strong|b)>)*Legislação\s+Esfera:[^L]+?Texto Integral:\s*(https://[^\s]+)'
-    matches = re.finditer(padrao_documento, content_limpo, re.DOTALL)
-    
-    for i, match in enumerate(matches, 1):
-        try:
-            bloco = match.group(0)
-            documento = {}
-            
-            # Extrai data de assinatura
-            match_assinatura = re.search(r'Assinatura:\s*(\d{2}/\d{2}/\d{4})', bloco)
-            if match_assinatura:
-                documento['data_assinatura'] = match_assinatura.group(1)
-            
-            # Extrai data de publicação
-            match_publicacao = re.search(r'Publicação:\s*(\d{2}/\d{2}/\d{4})', bloco)
-            if match_publicacao:
-                documento['data_publicacao'] = match_publicacao.group(1)
-            
-            # Extrai link do texto integral
-            documento['link_texto_integral'] = match.group(1)
-            
-            # Extrai número do documento do link
-            match_numero = re.search(r'/([^/]+)\.pdf$', documento['link_texto_integral'])
-            if match_numero:
-                documento['numero_documento'] = match_numero.group(1)
-            
-            # Extrai ementa (texto entre Publicação e Assunto)
-            match_ementa = re.search(r'Publicação:\s*\d{2}/\d{2}/\d{4}\s+(.*?)\s+Assunto:', bloco)
-            if match_ementa:
-                ementa = match_ementa.group(1).strip()
-                # Limpa a ementa
-                ementa = re.sub(r'\s+', ' ', ementa)
-                ementa = unescape(ementa)
-                documento['ementa'] = ementa
-            else:
-                documento['ementa'] = "Ementa não disponível"
-            
-            # Extrai assunto
-            match_assunto = re.search(r'Assunto:\s*([^Texto]+)', bloco)
-            if match_assunto:
-                documento['assunto'] = match_assunto.group(1).strip()
-            
-            # Procura por nota técnica no conteúdo completo
-            padrao_nota = rf'({re.escape(documento["link_texto_integral"])}.*?)(Nota Técnica[^:]*:\s*(https://[^\s]+))'
-            match_nota = re.search(padrao_nota, content_limpo)
-            if match_nota:
-                documento['link_nota_tecnica'] = match_nota.group(3)
-            
-            documento['termo_busca'] = 'Portaria'
-            documentos.append(documento)
-            logger.info(f"Documento {i} extraído: {documento.get('numero_documento', 'sem_numero')}")
-            
-        except Exception as e:
-            logger.error(f"Erro ao processar documento {i}: {e}")
-            continue
-    
-    logger.info(f"Total de documentos extraídos: {len(documentos)}")
-    return documentos
+    try:
+        soup = BeautifulSoup(content, 'html.parser')
+        
+        # Busca todas as fichas de detalhe
+        fichas = soup.find_all('div', class_='ficha-acervo-detalhe')
+        
+        logger.info(f"Encontradas {len(fichas)} fichas de detalhe no HTML")
+        
+        for i, ficha in enumerate(fichas, 1):
+            try:
+                documento = {}
+                
+                # Extrai título (contém número da portaria/despacho)
+                titulo = ficha.find('p', class_='titulo')
+                if titulo:
+                    titulo_text = titulo.get_text(strip=True)
+                    documento['titulo'] = re.sub(r'\s+', ' ', titulo_text)
+                
+                # Extrai data de assinatura
+                assinatura = ficha.find('p', class_='assinatura')
+                if assinatura:
+                    data_match = re.search(r'(\d{2}/\d{2}/\d{4})', assinatura.get_text())
+                    if data_match:
+                        documento['data_assinatura'] = data_match.group(1)
+                
+                # Extrai data de publicação
+                publicacao = ficha.find('p', class_='publicacao')
+                if publicacao:
+                    data_match = re.search(r'(\d{2}/\d{2}/\d{4})', publicacao.get_text())
+                    if data_match:
+                        documento['data_publicacao'] = data_match.group(1)
+                
+                # Extrai ementa
+                ementa_div = ficha.find('div', class_='texto-html-container')
+                if ementa_div:
+                    ementa_text = ementa_div.get_text(strip=True)
+                    documento['ementa'] = re.sub(r'\s+', ' ', ementa_text).replace('Ementa', '').strip()
+                else:
+                    documento['ementa'] = "Ementa não disponível"
+                
+                # Extrai assunto
+                assunto = ficha.find('p', class_='assunto')
+                if assunto:
+                    assunto_text = assunto.get_text(strip=True)
+                    documento['assunto'] = assunto_text.replace('Assunto', '').strip()
+                
+                # Extrai links de PDF (Texto Integral e Nota Técnica)
+                links_sites = ficha.find_all('p', class_='sites')
+                for link_site in links_sites:
+                    rotulo = link_site.find('span', class_='rotulo')
+                    if rotulo:
+                        rotulo_text = rotulo.get_text(strip=True)
+                        link_a = link_site.find('a')
+                        if link_a and link_a.get('href'):
+                            url = link_a.get('href')
+                            if 'Texto Integral' in rotulo_text:
+                                documento['link_texto_integral'] = url
+                                # Extrai número do documento
+                                match_numero = re.search(r'/([^/]+)\.pdf$', url)
+                                if match_numero:
+                                    documento['numero_documento'] = match_numero.group(1)
+                            elif 'Nota Técnica' in rotulo_text or 'Voto' in rotulo_text:
+                                documento['link_nota_tecnica'] = url
+                
+                documento['termo_busca'] = 'Portaria'
+                
+                # Só adiciona se tiver pelo menos o link do texto integral
+                if 'link_texto_integral' in documento:
+                    documentos.append(documento)
+                    logger.info(f"Documento {i} extraído: {documento.get('titulo', 'sem_titulo')}")
+                else:
+                    logger.warning(f"Documento {i} ignorado (sem link de texto integral)")
+                    
+            except Exception as e:
+                logger.error(f"Erro ao processar ficha {i}: {e}")
+                continue
+        
+        logger.info(f"Total de documentos extraídos: {len(documentos)}")
+        return documentos
+        
+    except Exception as e:
+        logger.error(f"Erro geral na extração: {e}")
+        logger.error(traceback.format_exc())
+        return []
 
 async def buscar_termo(pagina, termo, data_pesquisa):
     try:
@@ -142,18 +164,17 @@ async def buscar_termo(pagina, termo, data_pesquisa):
             f.write(content)
         logger.info("Página de resultados salva")
 
-        # REGEX ROBUSTO para detectar número de registros (aceita asteriscos, HTML, etc.)
-        registros_match = re.search(r'[*<b><strong>]*\s*(\d+)\s*[*</b></strong>]*\s+registros encontrados', content, re.IGNORECASE)
+        # Regex para detectar número de registros
+        registros_match = re.search(r'<strong>(\d+)</strong>\s*registros encontrados', content, re.IGNORECASE)
         if not registros_match:
-            # Tentativa alternativa ignorando formatação
-            registros_match = re.search(r'(\d+)\D+registros encontrados', content, re.IGNORECASE)
+            registros_match = re.search(r'(\d+)\s*registros encontrados', content, re.IGNORECASE)
         
         if registros_match:
             total_registros = int(registros_match.group(1))
             logger.info(f"Encontrados {total_registros} registros na busca")
         else:
             total_registros = 0
-            logger.warning("Não foi possível determinar o número de registros encontrados explicitamente!")
+            logger.warning("Não foi possível determinar o número de registros")
 
         if total_registros == 0:
             if "Nenhum registro encontrado" in content:
@@ -163,7 +184,7 @@ async def buscar_termo(pagina, termo, data_pesquisa):
         # Extrai documentos detalhados
         documentos = extrair_documentos_detalhados(content)
         
-        # Enriquece cada documento com informações adicionais
+        # Enriquece cada documento
         for doc in documentos:
             doc['data_busca'] = data_pesquisa
 
@@ -211,60 +232,52 @@ async def main_async():
         logger.info("Nenhum documento encontrado, e-mail não será enviado")
 
 def enviar_email(documentos):
-    # Lê variáveis de ambiente
     remetente = os.getenv("GMAIL_USER")
     senha = os.getenv("GMAIL_APP_PASSWORD")
     destinatario = os.getenv("EMAIL_DESTINATARIO")
     
-    # Logging pré-SMTP
     logger.info(f"Tentativa de envio e-mail de '{remetente}' para '{destinatario}'")
     
-    # Validação reforçada de credenciais
     if not remetente or not senha or not destinatario:
-        logger.error(f"Credenciais inválidas ou ausentes: remetente={remetente}, destinatario={destinatario}, senha={'OK' if senha else 'MISSING'}")
+        logger.error(f"Credenciais inválidas: remetente={remetente}, dest={destinatario}, senha={'OK' if senha else 'MISSING'}")
         return
 
-    assunto = f"📋 Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y')} - {len(documentos)} portaria(s)"
+    assunto = f"📋 Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y')} - {len(documentos)} documento(s)"
     
-    # Cabeçalho do e-mail
-    corpo = f"🔍 MONITORAMENTO ANEEL - PORTARIAS DO DIA {datetime.now().strftime('%d/%m/%Y')}\n"
-    corpo += f"═══════════════════════════════════════════════════════════════\n\n"
-    corpo += f"📊 TOTAL DE DOCUMENTOS ENCONTRADOS: {len(documentos)}\n\n"
+    corpo = f"🔍 MONITORAMENTO ANEEL - {datetime.now().strftime('%d/%m/%Y')}\n"
+    corpo += f"{'═' * 70}\n\n"
+    corpo += f"📊 TOTAL: {len(documentos)} documento(s)\n\n"
 
-    # Lista detalhada de cada documento
     for i, doc in enumerate(documentos, 1):
         corpo += f"📄 DOCUMENTO {i}\n"
-        corpo += f"{'─' * 50}\n"
+        corpo += f"{'─' * 60}\n"
         
-        # Ementa
+        if 'titulo' in doc:
+            corpo += f"📌 {doc['titulo']}\n\n"
+        
         if 'ementa' in doc and doc['ementa']:
             corpo += f"📝 EMENTA:\n   {doc['ementa']}\n\n"
         
-        # Assunto
         if 'assunto' in doc and doc['assunto']:
             corpo += f"🏷️  ASSUNTO: {doc['assunto']}\n"
         
-        # Datas
         if 'data_assinatura' in doc:
-            corpo += f"✍️  DATA DE ASSINATURA: {doc['data_assinatura']}\n"
+            corpo += f"✍️  ASSINATURA: {doc['data_assinatura']}\n"
         if 'data_publicacao' in doc:
-            corpo += f"📅 DATA DE PUBLICAÇÃO: {doc['data_publicacao']}\n"
+            corpo += f"📅 PUBLICAÇÃO: {doc['data_publicacao']}\n"
         
-        # Links
         if 'link_texto_integral' in doc:
             corpo += f"🔗 TEXTO INTEGRAL: {doc['link_texto_integral']}\n"
         if 'link_nota_tecnica' in doc:
             corpo += f"📋 NOTA TÉCNICA: {doc['link_nota_tecnica']}\n"
         
-        # Identificação do documento
         if 'numero_documento' in doc:
             corpo += f"🆔 NÚMERO: {doc['numero_documento']}\n"
         
-        corpo += f"\n{'═' * 60}\n\n"
+        corpo += f"\n{'═' * 70}\n\n"
 
-    # Rodapé
-    corpo += f"🤖 Este e-mail foi gerado automaticamente pelo sistema de monitoramento ANEEL.\n"
-    corpo += f"⏰ Data/hora: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}\n"
+    corpo += f"🤖 E-mail automático - Sistema de Monitoramento ANEEL\n"
+    corpo += f"⏰ {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}\n"
 
     msg = MIMEMultipart()
     msg["From"] = remetente
@@ -272,18 +285,17 @@ def enviar_email(documentos):
     msg["Subject"] = assunto
     msg.attach(MIMEText(corpo, "plain", "utf-8"))
 
-    # Bloco SMTP com tratamento de erro melhorado
     try:
         logger.info("Iniciando conexão SMTP...")
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
-            logger.info("Fazendo login no Gmail...")
+            logger.info("Fazendo login...")
             server.login(remetente, senha)
-            logger.info("Login realizado, enviando mensagem...")
+            logger.info("Enviando mensagem...")
             server.send_message(msg)
-        logger.info("E-mail enviado com sucesso!")
+        logger.info("✅ E-mail enviado com sucesso!")
     except Exception as e:
-        logger.error(f"Falha no envio de e-mail: {e}")
+        logger.error(f"❌ Falha no envio: {e}")
         logger.error(traceback.format_exc())
 
 def main():

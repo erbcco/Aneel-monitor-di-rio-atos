@@ -83,19 +83,23 @@ def enviar_email(docs):
     if not user or not pwd or not dest:
         logger.error("Credenciais faltando")
         return
-    assunto = f"ANEEL {datetime.now().strftime('%d/%m/%Y')} - {len(docs)} doc(s)"
+    subj = f"ANEEL {datetime.now().strftime('%d/%m/%Y')} - {len(docs)} doc(s)"
     body = f"Total: {len(docs)}\n\n"
     for i,d in enumerate(docs,1):
         body += f"{i}. {d.get('titulo','')} - {d.get('link_texto_integral','')}\n"
     msg = MIMEMultipart()
-    msg["From"]=user; msg["To"]=dest; msg["Subject"]=assunto
+    msg["From"] = user
+    msg["To"]   = dest
+    msg["Subject"] = subj
     msg.attach(MIMEText(body,"plain","utf-8"))
     try:
         with smtplib.SMTP("smtp.gmail.com",587) as s:
-            s.starttls(); s.login(user,pwd); s.send_message(msg)
-        logger.info("E-mail enviado")
+            s.starttls()
+            s.login(user,pwd)
+            s.send_message(msg)
+        logger.info("✅ E-mail enviado")
     except Exception as e:
-        logger.error(f"Falha envio: {e}\n{traceback.format_exc()}")
+        logger.error(f"❌ Falha envio: {e}\n{traceback.format_exc()}")
 
 async def main_async():
     data = datetime.now().strftime("%d/%m/%Y")

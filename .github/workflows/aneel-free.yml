@@ -33,7 +33,7 @@ jobs:
         run: python scraper_aneel_free.py
 
       - name: Listar arquivos gerados
-        run: ls -lh
+        run: ls -lh resultado_Portaria.html resultados_aneel.json scraper.log
 
       - name: Upload artefatos
         uses: actions/upload-artifact@v4

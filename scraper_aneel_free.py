@@ -33,8 +33,8 @@ def extrair_documentos_detalhados(content):
     # Remove quebras de linha e espaços excessivos para facilitar parsing
     content_limpo = re.sub(r'\s+', ' ', content)
     
-    # Procura por padrões de documentos
-    padrao_documento = r'Legislação\s+Esfera:[^Legislação]*?Texto Integral:\s*(https://[^\s]+)'
+    # Procura por padrões de documentos (considera possíveis tags HTML)
+    padrao_documento = r'(?:<\/*(?:strong|b)>)*Legislação\s+Esfera:[^L]+?Texto Integral:\s*(https://[^\s]+)'
     matches = re.finditer(padrao_documento, content_limpo, re.DOTALL)
     
     for i, match in enumerate(matches, 1):
@@ -142,14 +142,18 @@ async def buscar_termo(pagina, termo, data_pesquisa):
             f.write(content)
         logger.info("Página de resultados salva")
 
-        # Procura por "X registros encontrados"
-        registros_match = re.search(r'(\d+)\s*registros encontrados', content)
+        # REGEX ROBUSTO para detectar número de registros (aceita asteriscos, HTML, etc.)
+        registros_match = re.search(r'[*<b><strong>]*\s*(\d+)\s*[*</b></strong>]*\s+registros encontrados', content, re.IGNORECASE)
+        if not registros_match:
+            # Tentativa alternativa ignorando formatação
+            registros_match = re.search(r'(\d+)\D+registros encontrados', content, re.IGNORECASE)
+        
         if registros_match:
             total_registros = int(registros_match.group(1))
             logger.info(f"Encontrados {total_registros} registros na busca")
         else:
             total_registros = 0
-            logger.warning("Não foi possível determinar o número de registros")
+            logger.warning("Não foi possível determinar o número de registros encontrados explicitamente!")
 
         if total_registros == 0:
             if "Nenhum registro encontrado" in content:
@@ -212,10 +216,10 @@ def enviar_email(documentos):
     senha = os.getenv("GMAIL_APP_PASSWORD")
     destinatario = os.getenv("EMAIL_DESTINATARIO")
     
-    # LOGGING PRÉ-SMTP ADICIONADO
+    # Logging pré-SMTP
     logger.info(f"Tentativa de envio e-mail de '{remetente}' para '{destinatario}'")
     
-    # VALIDAÇÃO REFORÇADA DE CREDENCIAIS
+    # Validação reforçada de credenciais
     if not remetente or not senha or not destinatario:
         logger.error(f"Credenciais inválidas ou ausentes: remetente={remetente}, destinatario={destinatario}, senha={'OK' if senha else 'MISSING'}")
         return
@@ -268,7 +272,7 @@ def enviar_email(documentos):
     msg["Subject"] = assunto
     msg.attach(MIMEText(corpo, "plain", "utf-8"))
 
-    # BLOCO SMTP COM TRATAMENTO DE ERRO MELHORADO
+    # Bloco SMTP com tratamento de erro melhorado
     try:
         logger.info("Iniciando conexão SMTP...")
         with smtplib.SMTP("smtp.gmail.com", 587) as server:

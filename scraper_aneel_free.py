@@ -1,6 +1,5 @@
-import asyncio
-import traceback
-from playwright.async_api import async_playwright
+import requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 import json
 import logging
@@ -9,10 +8,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import re
-from html import unescape
-from bs4 import BeautifulSoup
+import traceback
 
-# Configuração de logging
+# Configuração logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("scraper_aneel")
 
@@ -21,285 +19,208 @@ file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 logger.addHandler(file_handler)
 
-PALAVRAS_CHAVE = ["Portaria"]
-
-def extrair_documentos_detalhados(content):
+def buscar_portarias(data_pesquisa):
     """
-    Extrai documentos com informações detalhadas usando BeautifulSoup
+    Busca portarias da ANEEL usando requisição HTTP direta
     """
-    documentos = []
-    logger.info("Iniciando extração de documentos detalhados")
+    logger.info(f"Buscando portarias para data: {data_pesquisa}")
+    
+    url = "https://biblioteca.aneel.gov.br/Busca/ResultadoBuscaLegislacao"
+    
+    # Parâmetros da busca
+    params = {
+        'LegislacaoPalavraChave': 'Portaria',
+        'LegislacaoTipoFiltroDataPublicacao': '0',  # Igual a
+        'LegislacaoDataPublicacao1': data_pesquisa,
+        'Guid': '',
+    }
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+    }
     
     try:
-        soup = BeautifulSoup(content, 'html.parser')
+        response = requests.post(url, data=params, headers=headers, timeout=30)
+        response.raise_for_status()
         
-        # Busca todas as fichas de detalhe
+        html_content = response.text
+        
+        # Salva HTML
+        with open("resultado_Portaria.html", "w", encoding="utf-8") as f:
+            f.write(html_content)
+        logger.info("Página de resultados salva")
+        
+        # Extrai documentos
+        documentos = extrair_documentos(html_content, data_pesquisa)
+        
+        return documentos
+        
+    except Exception as e:
+        logger.error(f"Erro na busca: {e}")
+        logger.error(traceback.format_exc())
+        return []
+
+def extrair_documentos(html_content, data_busca):
+    """
+    Extrai documentos do HTML usando BeautifulSoup
+    """
+    logger.info("Extraindo documentos do HTML")
+    documentos = []
+    
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Verifica total de registros
+        total_elem = soup.find(string=re.compile(r'\d+\s*registros encontrados'))
+        if total_elem:
+            match = re.search(r'(\d+)\s*registros', str(total_elem))
+            if match:
+                total = int(match.group(1))
+                logger.info(f"Total de registros encontrados: {total}")
+        
+        # Busca fichas de documentos
         fichas = soup.find_all('div', class_='ficha-acervo-detalhe')
-        
-        logger.info(f"Encontradas {len(fichas)} fichas de detalhe no HTML")
+        logger.info(f"Encontradas {len(fichas)} fichas no HTML")
         
         for i, ficha in enumerate(fichas, 1):
             try:
-                documento = {}
+                doc = {}
                 
-                # Extrai título (contém número da portaria/despacho)
+                # Título
                 titulo = ficha.find('p', class_='titulo')
                 if titulo:
-                    titulo_text = titulo.get_text(strip=True)
-                    documento['titulo'] = re.sub(r'\s+', ' ', titulo_text)
+                    doc['titulo'] = titulo.get_text(strip=True)
                 
-                # Extrai data de assinatura
+                # Data assinatura
                 assinatura = ficha.find('p', class_='assinatura')
                 if assinatura:
-                    data_match = re.search(r'(\d{2}/\d{2}/\d{4})', assinatura.get_text())
-                    if data_match:
-                        documento['data_assinatura'] = data_match.group(1)
+                    match = re.search(r'(\d{2}/\d{2}/\d{4})', assinatura.get_text())
+                    if match:
+                        doc['data_assinatura'] = match.group(1)
                 
-                # Extrai data de publicação
+                # Data publicação
                 publicacao = ficha.find('p', class_='publicacao')
                 if publicacao:
-                    data_match = re.search(r'(\d{2}/\d{2}/\d{4})', publicacao.get_text())
-                    if data_match:
-                        documento['data_publicacao'] = data_match.group(1)
+                    match = re.search(r'(\d{2}/\d{2}/\d{4})', publicacao.get_text())
+                    if match:
+                        doc['data_publicacao'] = match.group(1)
                 
-                # Extrai ementa
+                # Ementa
                 ementa_div = ficha.find('div', class_='texto-html-container')
                 if ementa_div:
-                    ementa_text = ementa_div.get_text(strip=True)
-                    documento['ementa'] = re.sub(r'\s+', ' ', ementa_text).replace('Ementa', '').strip()
-                else:
-                    documento['ementa'] = "Ementa não disponível"
+                    doc['ementa'] = ementa_div.get_text(strip=True)
                 
-                # Extrai assunto
+                # Assunto
                 assunto = ficha.find('p', class_='assunto')
                 if assunto:
-                    assunto_text = assunto.get_text(strip=True)
-                    documento['assunto'] = assunto_text.replace('Assunto', '').strip()
+                    doc['assunto'] = assunto.get_text(strip=True).replace('Assunto', '').strip()
                 
-                # Extrai links de PDF (Texto Integral e Nota Técnica)
-                links_sites = ficha.find_all('p', class_='sites')
-                for link_site in links_sites:
-                    rotulo = link_site.find('span', class_='rotulo')
-                    if rotulo:
+                # Links
+                links = ficha.find_all('p', class_='sites')
+                for link_p in links:
+                    rotulo = link_p.find('span', class_='rotulo')
+                    link_a = link_p.find('a')
+                    if rotulo and link_a:
                         rotulo_text = rotulo.get_text(strip=True)
-                        link_a = link_site.find('a')
-                        if link_a and link_a.get('href'):
-                            url = link_a.get('href')
-                            if 'Texto Integral' in rotulo_text:
-                                documento['link_texto_integral'] = url
-                                # Extrai número do documento
-                                match_numero = re.search(r'/([^/]+)\.pdf$', url)
-                                if match_numero:
-                                    documento['numero_documento'] = match_numero.group(1)
-                            elif 'Nota Técnica' in rotulo_text or 'Voto' in rotulo_text:
-                                documento['link_nota_tecnica'] = url
+                        href = link_a.get('href', '')
+                        if 'Texto Integral' in rotulo_text and href:
+                            doc['link_texto_integral'] = href
+                        elif ('Nota' in rotulo_text or 'Voto' in rotulo_text) and href:
+                            doc['link_nota_tecnica'] = href
                 
-                documento['termo_busca'] = 'Portaria'
+                doc['data_busca'] = data_busca
                 
-                # Só adiciona se tiver pelo menos o link do texto integral
-                if 'link_texto_integral' in documento:
-                    documentos.append(documento)
-                    logger.info(f"Documento {i} extraído: {documento.get('titulo', 'sem_titulo')}")
-                else:
-                    logger.warning(f"Documento {i} ignorado (sem link de texto integral)")
+                if 'link_texto_integral' in doc:
+                    documentos.append(doc)
+                    logger.info(f"Documento {i} extraído")
                     
             except Exception as e:
                 logger.error(f"Erro ao processar ficha {i}: {e}")
                 continue
         
-        logger.info(f"Total de documentos extraídos: {len(documentos)}")
+        logger.info(f"Total extraído: {len(documentos)}")
         return documentos
         
     except Exception as e:
-        logger.error(f"Erro geral na extração: {e}")
+        logger.error(f"Erro na extração: {e}")
         logger.error(traceback.format_exc())
         return []
-
-async def buscar_termo(pagina, termo, data_pesquisa):
-    try:
-        logger.info(f"Iniciando busca pelo termo: {termo} - Data: {data_pesquisa}")
-        await pagina.goto("https://biblioteca.aneel.gov.br/Busca/Avancada", wait_until="networkidle")
-
-        # Clica na aba Legislação
-        await pagina.wait_for_selector('button:has-text("Legislação"), a:has-text("Legislação")', timeout=10000)
-        try:
-            await pagina.click('button:has-text("Legislação")')
-        except:
-            await pagina.click('a:has-text("Legislação")')
-        
-        await asyncio.sleep(2)
-
-        # Preenche campos
-        input_palavra = pagina.locator('input[name="LegislacaoPalavraChave"]')
-        await input_palavra.clear()
-        await input_palavra.fill(termo)
-        await asyncio.sleep(1)
-        
-        valor_preenchido = await input_palavra.input_value()
-        logger.info(f"Valor no campo palavra-chave: '{valor_preenchido}'")
-
-        await pagina.select_option('select[name="LegislacaoTipoFiltroDataPublicacao"]', label='Igual a')
-        await asyncio.sleep(1)
-
-        input_data = pagina.locator('input[name="LegislacaoDataPublicacao1"]')
-        await input_data.clear()
-        await input_data.fill(data_pesquisa)
-        await asyncio.sleep(1)
-        
-        data_preenchida = await input_data.input_value()
-        logger.info(f"Valor no campo data: '{data_preenchida}'")
-        logger.info("Campos de busca preenchidos e verificados")
-
-        # Executa busca
-        await asyncio.sleep(2)
-        await pagina.click('button:has-text("Buscar")')
-        await pagina.wait_for_load_state('networkidle')
-        await asyncio.sleep(5)
-        
-        logger.info("Busca executada e página carregada")
-
-        # Salva página de resultados
-        content = await pagina.content()
-        with open(f"resultado_{termo}.html", "w", encoding="utf-8") as f:
-            f.write(content)
-        logger.info("Página de resultados salva")
-
-        # Regex para detectar número de registros
-        registros_match = re.search(r'<strong>(\d+)</strong>\s*registros encontrados', content, re.IGNORECASE)
-        if not registros_match:
-            registros_match = re.search(r'(\d+)\s*registros encontrados', content, re.IGNORECASE)
-        
-        if registros_match:
-            total_registros = int(registros_match.group(1))
-            logger.info(f"Encontrados {total_registros} registros na busca")
-        else:
-            total_registros = 0
-            logger.warning("Não foi possível determinar o número de registros")
-
-        if total_registros == 0:
-            if "Nenhum registro encontrado" in content:
-                logger.info("Nenhum registro encontrado para a busca")
-            return []
-
-        # Extrai documentos detalhados
-        documentos = extrair_documentos_detalhados(content)
-        
-        # Enriquece cada documento
-        for doc in documentos:
-            doc['data_busca'] = data_pesquisa
-
-        logger.info(f"Total de documentos processados: {len(documentos)}")
-        return documentos
-
-    except Exception as e:
-        logger.error(f"Erro ao buscar termo '{termo}': {e}")
-        logger.error(traceback.format_exc())
-        try:
-            with open(f"erro_{termo}.html", "w", encoding="utf-8") as f:
-                f.write(await pagina.content())
-        except:
-            pass
-        return []
-
-async def main_async():
-    data_pesquisa = datetime.now().strftime("%d/%m/%Y")
-    logger.info(f"Executando busca para data: {data_pesquisa}")
-    documentos_totais = []
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.set_viewport_size({"width": 1280, "height": 720})
-
-        for termo in PALAVRAS_CHAVE:
-            documentos = await buscar_termo(page, termo, data_pesquisa)
-            documentos_totais.extend(documentos)
-
-        await browser.close()
-
-    # Salva resultados
-    with open("resultados_aneel.json", "w", encoding="utf-8") as f:
-        json.dump({
-            "data_execucao": datetime.now().isoformat(),
-            "total_documentos": len(documentos_totais),
-            "documentos": documentos_totais
-        }, f, ensure_ascii=False, indent=2)
-
-    if documentos_totais:
-        enviar_email(documentos_totais)
-        logger.info(f"Processo concluído. {len(documentos_totais)} documentos encontrados e e-mail enviado.")
-    else:
-        logger.info("Nenhum documento encontrado, e-mail não será enviado")
 
 def enviar_email(documentos):
     remetente = os.getenv("GMAIL_USER")
     senha = os.getenv("GMAIL_APP_PASSWORD")
     destinatario = os.getenv("EMAIL_DESTINATARIO")
     
-    logger.info(f"Tentativa de envio e-mail de '{remetente}' para '{destinatario}'")
+    logger.info(f"Enviando e-mail de '{remetente}' para '{destinatario}'")
     
     if not remetente or not senha or not destinatario:
-        logger.error(f"Credenciais inválidas: remetente={remetente}, dest={destinatario}, senha={'OK' if senha else 'MISSING'}")
+        logger.error("Credenciais ausentes")
         return
-
-    assunto = f"📋 Monitoramento ANEEL - {datetime.now().strftime('%d/%m/%Y')} - {len(documentos)} documento(s)"
+    
+    assunto = f"📋 ANEEL {datetime.now().strftime('%d/%m/%Y')} - {len(documentos)} documento(s)"
     
     corpo = f"🔍 MONITORAMENTO ANEEL - {datetime.now().strftime('%d/%m/%Y')}\n"
-    corpo += f"{'═' * 70}\n\n"
+    corpo += f"{'=' * 70}\n\n"
     corpo += f"📊 TOTAL: {len(documentos)} documento(s)\n\n"
-
+    
     for i, doc in enumerate(documentos, 1):
         corpo += f"📄 DOCUMENTO {i}\n"
-        corpo += f"{'─' * 60}\n"
+        corpo += f"{'-' * 60}\n"
         
         if 'titulo' in doc:
             corpo += f"📌 {doc['titulo']}\n\n"
-        
-        if 'ementa' in doc and doc['ementa']:
-            corpo += f"📝 EMENTA:\n   {doc['ementa']}\n\n"
-        
-        if 'assunto' in doc and doc['assunto']:
+        if 'ementa' in doc:
+            corpo += f"📝 {doc['ementa']}\n\n"
+        if 'assunto' in doc:
             corpo += f"🏷️  ASSUNTO: {doc['assunto']}\n"
-        
         if 'data_assinatura' in doc:
             corpo += f"✍️  ASSINATURA: {doc['data_assinatura']}\n"
         if 'data_publicacao' in doc:
             corpo += f"📅 PUBLICAÇÃO: {doc['data_publicacao']}\n"
-        
         if 'link_texto_integral' in doc:
-            corpo += f"🔗 TEXTO INTEGRAL: {doc['link_texto_integral']}\n"
-        if 'link_nota_tecnica' in doc:
-            corpo += f"📋 NOTA TÉCNICA: {doc['link_nota_tecnica']}\n"
+            corpo += f"🔗 LINK: {doc['link_texto_integral']}\n"
         
-        if 'numero_documento' in doc:
-            corpo += f"🆔 NÚMERO: {doc['numero_documento']}\n"
-        
-        corpo += f"\n{'═' * 70}\n\n"
-
-    corpo += f"🤖 E-mail automático - Sistema de Monitoramento ANEEL\n"
-    corpo += f"⏰ {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}\n"
-
+        corpo += f"\n{'=' * 70}\n\n"
+    
+    corpo += f"🤖 E-mail automático\n⏰ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+    
     msg = MIMEMultipart()
     msg["From"] = remetente
     msg["To"] = destinatario
     msg["Subject"] = assunto
     msg.attach(MIMEText(corpo, "plain", "utf-8"))
-
+    
     try:
-        logger.info("Iniciando conexão SMTP...")
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
-            logger.info("Fazendo login...")
             server.login(remetente, senha)
-            logger.info("Enviando mensagem...")
             server.send_message(msg)
-        logger.info("✅ E-mail enviado com sucesso!")
+        logger.info("✅ E-mail enviado!")
     except Exception as e:
         logger.error(f"❌ Falha no envio: {e}")
         logger.error(traceback.format_exc())
 
 def main():
-    asyncio.run(main_async())
+    data_pesquisa = datetime.now().strftime("%d/%m/%Y")
+    logger.info(f"Iniciando busca para {data_pesquisa}")
+    
+    documentos = buscar_portarias(data_pesquisa)
+    
+    # Salva JSON
+    with open("resultados_aneel.json", "w", encoding="utf-8") as f:
+        json.dump({
+            "data_execucao": datetime.now().isoformat(),
+            "total_documentos": len(documentos),
+            "documentos": documentos
+        }, f, ensure_ascii=False, indent=2)
+    
+    if documentos:
+        enviar_email(documentos)
+        logger.info(f"✅ Processo concluído: {len(documentos)} documentos")
+    else:
+        logger.info("⚠️ Nenhum documento encontrado")
 
 if __name__ == "__main__":
     main()
